@@ -1,75 +1,115 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import 'leaflet/dist/leaflet.css'
 
-// ── Zone metadata ──────────────────────────────────────────────
-const FILL   = { oriente: '#16A34A', norte: '#DC2626', sur: '#D97706' } as const
-const BG     = { oriente: '#DCFCE7', norte: '#FEE2E2', sur: '#FEF3C7' } as const
+/* ── Available communes (NFD-normalized, no accents) ─────────────── */
+const AVAILABLE = new Set([
+  'providencia','nunoa','las condes','vitacura','lo barnechea','la reina',
+  'santiago','recoleta','independencia','renca','quilicura','huechuraba',
+  'pudahuel','estacion central','cerrillos','maipu',
+  'macul','penalolen','la florida','puente alto','san joaquin','san miguel',
+  'la cisterna','el bosque','la granja','san ramon','pedro aguirre cerda',
+])
 
-interface ZoneMeta { label: string; communes: string; emoji: string }
-const META: Record<string, ZoneMeta> = {
-  oriente: {
-    label:   'Zona Oriente',
-    emoji:   '🥑',
-    communes: 'Providencia · Ñuñoa · Las Condes · Vitacura · Lo Barnechea · La Reina',
-  },
-  norte: {
-    label:   'Zona Norte · Centro · Poniente',
-    emoji:   '🍊',
-    communes: 'Santiago · Recoleta · Independencia · Renca · Quilicura · Huechuraba · Pudahuel · Estación Central · Cerrillos · Maipú',
-  },
-  sur: {
-    label:   'Zona Sur',
-    emoji:   '🍅',
-    communes: 'Macul · Peñalolén · La Florida · Puente Alto · San Joaquín · San Miguel · La Cisterna · El Bosque · La Granja · San Ramón · Pedro Aguirre Cerda',
-  },
-}
-
-// Keys are NFD-normalized (no accents, lowercase)
-const COMMUNE_ZONE: Record<string, keyof typeof FILL> = {
-  providencia: 'oriente', nunoa: 'oriente', 'las condes': 'oriente',
-  vitacura: 'oriente', 'lo barnechea': 'oriente', 'la reina': 'oriente',
-  santiago: 'norte', recoleta: 'norte', independencia: 'norte',
-  renca: 'norte', quilicura: 'norte', huechuraba: 'norte',
-  pudahuel: 'norte', 'estacion central': 'norte', cerrillos: 'norte', maipu: 'norte',
-  macul: 'sur', penalolen: 'sur', 'la florida': 'sur', 'puente alto': 'sur',
-  'san joaquin': 'sur', 'san miguel': 'sur', 'la cisterna': 'sur',
-  'el bosque': 'sur', 'la granja': 'sur', 'san ramon': 'sur',
-  'pedro aguirre cerda': 'sur',
-}
+/* Display names for autocomplete (sorted A→Z) */
+const COMMUNE_LIST = [
+  'Cerrillos','El Bosque','Estación Central','Huechuraba','Independencia',
+  'La Cisterna','La Florida','La Granja','La Reina','Las Condes',
+  'Lo Barnechea','Macul','Maipú','Ñuñoa','Pedro Aguirre Cerda',
+  'Peñalolén','Providencia','Pudahuel','Puente Alto','Quilicura',
+  'Recoleta','Renca','San Joaquín','San Miguel','San Ramón',
+  'Santiago','Vitacura',
+].sort()
 
 function norm(s: string): string {
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
 }
 
-function tooltipHTML(zone: keyof typeof FILL): string {
-  const m = META[zone]
-  const fill = FILL[zone]
-  const bg   = BG[zone]
-  return (
-    `<div style="font-family:Inter,system-ui,sans-serif;min-width:220px;max-width:280px;padding:2px 0">` +
-    `<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">` +
-    `<span style="width:10px;height:10px;border-radius:50%;background:${fill};flex-shrink:0"></span>` +
-    `<strong style="font-size:14px;color:#1B2B1E;line-height:1.2">${m.label}</strong>` +
-    `</div>` +
-    `<p style="font-size:11px;color:#6B7A6F;line-height:1.6;margin:0 0 10px;letter-spacing:.01em">${m.communes}</p>` +
-    `<div style="display:flex;align-items:center;justify-content:space-between;background:${bg};border-radius:10px;padding:8px 12px">` +
-    `<span style="font-size:11px;color:#374151;font-weight:600">Despacho a domicilio</span>` +
-    `<strong style="font-size:16px;color:#1B2B1E;letter-spacing:-.5px">$2.990</strong>` +
-    `</div>` +
-    `</div>`
-  )
+/* ── Layer styles (defined once, never re-created) ───────────────── */
+const S_AVAIL   = { fillColor:'#22C55E', fillOpacity:0.20, color:'#16A34A', weight:1.0, opacity:0.45 }
+const S_UNAVAIL = { fillColor:'#94A3B8', fillOpacity:0.06, color:'#CBD5E1', weight:0.5, opacity:0.30 }
+const S_HOVER   = { fillOpacity:0.38, weight:1.8 }
+const S_HI      = { fillColor:'#16A34A', fillOpacity:0.52, color:'#15803D', weight:2.2, opacity:0.9 }
+
+const BIZ: [number, number]  = [-33.490, -70.598]
+const CENTER: [number, number] = [-33.47, -70.64]
+const ZOOM = 10
+
+/* ── Inline-style helpers ────────────────────────────────────────── */
+const glass: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.93)',
+  backdropFilter: 'blur(18px)',
+  WebkitBackdropFilter: 'blur(18px)',
+  boxShadow: '0 4px 24px rgba(0,0,0,0.09),0 1px 4px rgba(0,0,0,0.05)',
 }
 
-const BIZ: [number, number] = [-33.490, -70.598] // Los Olmos 3967, Macul
-
 export default function ZonesMap() {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<any>(null)
+  const mapContainer = useRef<HTMLDivElement>(null)
+  const mapRef       = useRef<any>(null)
+  const layersRef    = useRef<Record<string, any>>({})
+  const hiRef        = useRef<string | null>(null)
+  const timerRef     = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const [search, setSearch]   = useState('')
+  const [open, setOpen]       = useState(false)
+  const [status, setStatus]   = useState<'idle'|'found'|'notfound'>('idle')
+
+  /* Autocomplete list — derived, not state */
+  const suggestions = useMemo(() => {
+    const q = norm(search)
+    if (!q) return []
+    return COMMUNE_LIST.filter(n => norm(n).includes(q)).slice(0, 6)
+  }, [search])
+
+  /* Fly to a commune, highlight it, open popup */
+  const flyTo = useCallback((name: string) => {
+    const key   = norm(name)
+    const layer = layersRef.current[key]
+    if (!layer || !mapRef.current) return
+
+    // Reset previous highlight
+    if (hiRef.current && hiRef.current !== key) {
+      const prev = layersRef.current[hiRef.current]
+      if (prev) prev.setStyle({ ...S_AVAIL })
+    }
+
+    mapRef.current.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 13 })
+    layer.setStyle({ ...S_HI })
+    layer.openPopup()
+    hiRef.current = key
+
+    setStatus(AVAILABLE.has(key) ? 'found' : 'notfound')
+    setSearch(name)
+    setOpen(false)
+
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => {
+      const l = layersRef.current[key]
+      if (l) l.setStyle({ ...S_AVAIL })
+      hiRef.current = null
+    }, 3500)
+  }, [])
+
+  /* Enter key / submit search */
+  const handleSearch = useCallback(() => {
+    const q = norm(search)
+    if (!q) return
+    const match =
+      COMMUNE_LIST.find(n => norm(n) === q) ??
+      COMMUNE_LIST.find(n => norm(n).startsWith(q)) ??
+      COMMUNE_LIST.find(n => norm(n).includes(q))
+    if (match) {
+      flyTo(match)
+    } else {
+      setStatus('notfound')
+      setOpen(false)
+    }
+  }, [search, flyTo])
+
+  /* Boot Leaflet once */
   useEffect(() => {
-    const container = containerRef.current
+    const container = mapContainer.current
     if (!container || mapRef.current) return
 
     let map: any = null
@@ -78,134 +118,224 @@ export default function ZonesMap() {
       const L = (await import('leaflet')).default
 
       map = L.map(container!, {
-        center: [-33.47, -70.64],
-        zoom: 10,
+        center: CENTER,
+        zoom: ZOOM,
         zoomControl: false,
         scrollWheelZoom: false,
         attributionControl: true,
       })
       mapRef.current = map
 
-      // CartoDB Positron — light, minimal, premium feel
-      L.tileLayer(
-        'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-        {
-          attribution:
-            '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> ' +
-            '© <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',
-          subdomains: 'abcd',
-          maxZoom: 19,
-        }
-      ).addTo(map)
+      /* CartoDB Positron — reduced opacity for less visual noise */
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+        attribution:
+          '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> ' +
+          '© <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19,
+        opacity: 0.60,
+      }).addTo(map)
 
-      // ── GeoJSON zones ──────────────────────────────────────────
+      /* GeoJSON layer */
       try {
         const res = await fetch(
           'https://raw.githubusercontent.com/fcortes/Chile-GeoJSON/master/Comunal.geojson'
         )
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data: any = await res.json()
 
         L.geoJSON(data, {
-          filter(f) {
-            return Number(f?.properties?.COD_REGI) === 13
+          filter:  (f) => Number(f?.properties?.COD_REGI) === 13,
+          style:   (f) => {
+            const k = norm(f?.properties?.NOM_COM ?? '')
+            return AVAILABLE.has(k) ? { ...S_AVAIL } : { ...S_UNAVAIL }
           },
-          style(f) {
+          onEachFeature: (f, layer) => {
             const raw: string = f?.properties?.NOM_COM ?? ''
-            const zone = COMMUNE_ZONE[norm(raw)]
-            if (!zone) {
-              return {
-                fillColor: '#E5E7EB',
-                fillOpacity: 0.35,
-                color: '#D1D5DB',
-                weight: 0.8,
-                opacity: 0.7,
-              }
-            }
-            return {
-              fillColor:   FILL[zone],
-              fillOpacity: 0.38,
-              color:       FILL[zone],
-              weight:      1.8,
-              opacity:     0.75,
-            }
-          },
-          onEachFeature(f, layer) {
-            const raw: string = f?.properties?.NOM_COM ?? ''
-            const zone = COMMUNE_ZONE[norm(raw)]
-            if (!zone) return
+            const key = norm(raw)
+            const avail = AVAILABLE.has(key)
 
-            layer.bindTooltip(tooltipHTML(zone), {
-              sticky: true,
-              opacity: 1,
-              className: 'zm-tooltip',
-            })
+            layersRef.current[key] = layer
+            if (!avail) return
 
-            layer.bindPopup(tooltipHTML(zone), {
-              className: 'zm-popup',
-              closeButton: false,
-              maxWidth: 280,
-            })
-
-            layer.on('click', () => layer.openPopup())
-
-            layer.on('mouseover', () =>
-              (layer as any).setStyle({
-                fillOpacity: 0.58,
-                weight: 2.5,
-              })
+            /* Minimal popup */
+            layer.bindPopup(
+              `<div style="font-family:Inter,system-ui,sans-serif;min-width:150px;padding:2px 0">` +
+              `<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">` +
+              `<span style="width:7px;height:7px;border-radius:50%;background:#22C55E;flex-shrink:0"></span>` +
+              `<strong style="font-size:13px;color:#1B2B1E">${raw}</strong>` +
+              `</div>` +
+              `<p style="font-size:11px;color:#15803D;font-weight:700;margin:0 0 3px">✓ Hacemos despacho aquí</p>` +
+              `<p style="font-size:11px;color:#6B7A6F;margin:0">$2.990 · Mínimo $20.000</p>` +
+              `</div>`,
+              { closeButton: false, className: 'zm-popup', maxWidth: 210 }
             )
-            layer.on('mouseout', () =>
-              (layer as any).setStyle({
-                fillOpacity: 0.38,
-                weight: 1.8,
-              })
-            )
+
+            layer.on('click',     () => layer.openPopup())
+            layer.on('mouseover', () => (layer as any).setStyle({ ...S_AVAIL, ...S_HOVER }))
+            layer.on('mouseout',  () => {
+              if (hiRef.current !== key) (layer as any).setStyle({ ...S_AVAIL })
+            })
           },
         }).addTo(map)
       } catch (err) {
-        console.error('[ZonesMap] GeoJSON error:', err)
+        console.error('[ZonesMap]', err)
       }
 
-      // ── Business marker ────────────────────────────────────────
-      const logoIcon = L.divIcon({
-        html:
-          `<div style="` +
-          `width:46px;height:46px;border-radius:50%;` +
-          `background:#fff;` +
-          `box-shadow:0 4px 16px rgba(0,0,0,.22),0 0 0 3px #16A34A,0 0 0 5px rgba(22,163,74,.2);` +
-          `display:grid;place-items:center;` +
-          `">` +
-          `<img src="/logo/elmenu-color.png" style="width:32px;height:32px;object-fit:contain" alt="El Menú" />` +
-          `</div>`,
-        className: 'zm-logo-icon',
-        iconSize:   [46, 46],
-        iconAnchor: [23, 23],
-        popupAnchor:[0, -28],
+      /* El Menú — small dot marker */
+      const dot = L.divIcon({
+        html: `<div style="width:10px;height:10px;border-radius:50%;background:#1B2B1E;` +
+              `box-shadow:0 0 0 3px rgba(27,43,30,.18),0 0 0 7px rgba(27,43,30,.07)"></div>`,
+        className: '',
+        iconSize: [10, 10],
+        iconAnchor: [5, 5],
       })
-
-      L.marker(BIZ, { icon: logoIcon, zIndexOffset: 1000 })
-        .addTo(map)
+      L.marker(BIZ, { icon: dot, zIndexOffset: 1000 }).addTo(map)
         .bindPopup(
-          `<div style="font-family:Inter,system-ui,sans-serif;padding:4px 0;min-width:160px">` +
-          `<strong style="font-size:13px;color:#1B2B1E;display:block;margin-bottom:4px">El Menú</strong>` +
-          `<span style="font-size:12px;color:#6B7A6F;display:block;margin-bottom:4px">Los Olmos 3967, Macul</span>` +
-          `<span style="font-size:11px;font-weight:600;color:#2D6A4F">Lun–Sáb · 8:00–20:00</span>` +
+          `<div style="font-family:Inter,system-ui,sans-serif;padding:2px 0;min-width:130px">` +
+          `<strong style="font-size:12px;color:#1B2B1E;display:block;margin-bottom:2px">El Menú · Macul</strong>` +
+          `<span style="font-size:11px;color:#6B7A6F">Los Olmos 3967</span>` +
           `</div>`,
           { closeButton: false, className: 'zm-popup' }
         )
     }
 
     boot()
-
     return () => {
-      if (map) {
-        map.remove()
-        mapRef.current = null
-      }
+      if (timerRef.current) clearTimeout(timerRef.current)
+      if (map) { map.remove(); mapRef.current = null }
     }
   }, [])
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+  /* ─────────────────── JSX ─────────────────── */
+  return (
+    <div style={{ position:'relative', width:'100%', height:'100%' }}>
+
+      {/* ── Search bar ── */}
+      <div style={{ position:'absolute', top:12, left:12, right:12, zIndex:1000, pointerEvents:'auto' }}>
+        <div style={{ ...glass, borderRadius:14, overflow:'hidden' }}>
+
+          {/* Input */}
+          <div style={{ display:'flex', alignItems:'center', paddingLeft:13, paddingRight:6 }}>
+            <svg width="15" height="15" fill="none" stroke="#9CA3AF" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" style={{ flexShrink:0 }}>
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={e => { setSearch(e.target.value); setOpen(true); setStatus('idle') }}
+              onKeyDown={e => e.key === 'Enter' && handleSearch()}
+              onFocus={() => search && setOpen(true)}
+              placeholder="¿Tu comuna tiene despacho?"
+              style={{
+                flex:1, height:44, border:0, background:'transparent',
+                fontSize:14, color:'#1B2B1E', outline:'none',
+                padding:'0 10px',
+                fontFamily:'Inter,system-ui,sans-serif',
+                WebkitAppearance:'none',
+              }}
+            />
+            {search && (
+              <button
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => { setSearch(''); setStatus('idle'); setOpen(false) }}
+                aria-label="Limpiar"
+                style={{ border:0, background:'none', cursor:'pointer', padding:'0 7px', color:'#9CA3AF', lineHeight:1, flexShrink:0 }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Autocomplete */}
+          {open && suggestions.length > 0 && (
+            <div style={{ borderTop:'1px solid rgba(0,0,0,0.05)' }}>
+              {suggestions.map(name => (
+                <button
+                  key={name}
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => flyTo(name)}
+                  style={{
+                    display:'flex', alignItems:'center', gap:9,
+                    width:'100%', padding:'10px 14px',
+                    background:'none', border:0, cursor:'pointer',
+                    textAlign:'left', fontSize:13, color:'#1B2B1E',
+                    fontFamily:'Inter,system-ui,sans-serif',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(34,197,94,.07)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                >
+                  <span style={{ width:6, height:6, borderRadius:'50%', background:'#22C55E', flexShrink:0 }} />
+                  {name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Status */}
+          {status !== 'idle' && (
+            <div style={{
+              display:'flex', alignItems:'center', gap:7,
+              padding:'9px 14px',
+              borderTop:'1px solid rgba(0,0,0,0.05)',
+              fontSize:12, fontWeight:600,
+              color: status === 'found' ? '#15803D' : '#B91C1C',
+              background: status === 'found' ? 'rgba(34,197,94,.06)' : 'rgba(239,68,68,.05)',
+              fontFamily:'Inter,system-ui,sans-serif',
+            }}>
+              {status === 'found'
+                ? <><span>🚚</span><span>Sí, hacemos despacho a esa comuna</span></>
+                : <><span style={{ fontSize:11 }}>✕</span><span>Aún no llegamos a esa zona</span></>}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Leaflet map container ── */}
+      <div ref={mapContainer} style={{ width:'100%', height:'100%' }} />
+
+      {/* ── Store card ── */}
+      <div style={{
+        position:'absolute', bottom:20, left:12, zIndex:1000, pointerEvents:'auto',
+        ...glass,
+        borderRadius:16,
+        padding:'12px 14px',
+        maxWidth:224,
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:7 }}>
+          <img
+            src="/logo/elmenu-color.png"
+            alt="El Menú"
+            style={{ width:32, height:32, objectFit:'contain', flexShrink:0 }}
+          />
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:'#1B2B1E', letterSpacing:'.03em', fontFamily:'Inter,system-ui,sans-serif' }}>
+              EL MENÚ
+            </div>
+            <div style={{ fontSize:10, color:'#6B7A6F', marginTop:1, fontFamily:'Inter,system-ui,sans-serif' }}>
+              Los Olmos 3967, Macul
+            </div>
+          </div>
+        </div>
+        <p style={{ fontSize:10, color:'#6B7A6F', margin:'0 0 9px', lineHeight:1.5, fontFamily:'Inter,system-ui,sans-serif' }}>
+          Despachos en comunas seleccionadas de Santiago
+        </p>
+        <button
+          onClick={() => mapRef.current?.setView(CENTER, ZOOM, { animate: true })}
+          style={{
+            display:'block', width:'100%', padding:'7px 0',
+            background:'#1B2B1E', color:'#fff', border:0, borderRadius:9,
+            fontSize:11, fontWeight:600, cursor:'pointer',
+            fontFamily:'Inter,system-ui,sans-serif', letterSpacing:'.02em',
+          }}
+        >
+          Ver cobertura
+        </button>
+      </div>
+
+    </div>
+  )
 }

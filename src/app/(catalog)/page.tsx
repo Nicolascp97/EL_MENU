@@ -314,12 +314,9 @@ const CSS = `
   .nav-hamburger-m { display: none; }
 
   /* ZONES SECTION */
-  .zones-frame { border-radius: var(--radius-xl); overflow: hidden; box-shadow: 0 20px 56px rgba(27,43,30,.09), 0 4px 16px rgba(27,43,30,.05); height: 560px; position: relative; background: #F0F4F0; }
+  .zones-frame { border-radius: var(--radius-xl); overflow: hidden; box-shadow: 0 20px 56px rgba(27,43,30,.09), 0 4px 16px rgba(27,43,30,.05); height: 500px; position: relative; background: #F0F4F0; }
   .zones-frame .leaflet-container { width: 100%; height: 100%; z-index: 1; }
-  .zones-frame .leaflet-control-attribution { font-size: 10px; background: rgba(255,255,255,.7); }
-  .zm-logo-icon { background: transparent !important; border: none !important; }
-  .zm-tooltip { background: #fff !important; border: 1px solid rgba(27,43,30,.08) !important; border-radius: 14px !important; padding: 14px 16px !important; box-shadow: 0 12px 40px rgba(27,43,30,.12) !important; pointer-events: none; }
-  .zm-tooltip::before { display: none !important; }
+  .zones-frame .leaflet-control-attribution { font-size: 10px; background: rgba(255,255,255,.6); }
   .zm-popup .leaflet-popup-content-wrapper { border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.12); border: 1px solid rgba(27,43,30,.08); }
   .zm-popup .leaflet-popup-tip-container { display: none; }
   .zones-legend { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin-top: 14px; padding: 0 2px; }
@@ -345,7 +342,7 @@ const CSS = `
   @media (max-width: 640px) {
     section { padding: 40px 0; }
     .container { padding: 0 16px; }
-    .zones-frame { height: 380px; border-radius: var(--radius-lg); }
+    .zones-frame { height: 390px; border-radius: var(--radius-lg); }
     .zones-legend { gap: 12px; }
     .zl-sep { display: none; }
     .nav .inner { display: flex; align-items: center; gap: 8px; padding: 0 16px; }
@@ -416,36 +413,6 @@ const HOW_STEPS = [
   { cls: 's', emoji: '💳', num: '02', title: 'Paga en segundos', desc: 'Webpay Plus de Transbank. Confirmación instantánea, sin esperas ni sorpresas.' },
   { cls: 'l', emoji: '🚚', num: '03', title: 'Despachamos ese día', desc: 'Pedidos antes de las 16:00 salen ese mismo día a las 27 comunas que cubrimos.' },
   { cls: 'c', emoji: '🌿', num: '04', title: 'Recibes fresco', desc: 'Garantía de frescura. Si algo no llega en punto, lo cambiamos o te devolvemos el dinero.' },
-]
-
-const ZONES = [
-  {
-    cls: 'oriente',
-    name: 'Zona Oriente',
-    comunas: 'Providencia, Ñuñoa, Las Condes, Vitacura, Lo Barnechea, La Reina',
-    delivery: '$2.990',
-    min: '$20.000',
-    eta: 'Mismo día · pedidos antes 16:00',
-    emoji: '🥑',
-  },
-  {
-    cls: 'norte',
-    name: 'Zona Norte · Centro · Poniente',
-    comunas: 'Santiago, Recoleta, Independencia, Renca, Quilicura, Huechuraba, Pudahuel, Estación Central, Cerrillos, Maipú',
-    delivery: '$2.990',
-    min: '$20.000',
-    eta: 'Día siguiente · pedidos antes 18:00',
-    emoji: '🍊',
-  },
-  {
-    cls: 'sur',
-    name: 'Zona Sur',
-    comunas: 'Macul, Peñalolén, La Florida, Puente Alto, San Joaquín, San Miguel, La Cisterna, El Bosque, La Granja, San Ramón, Pedro Aguirre Cerda',
-    delivery: '$2.990',
-    min: '$20.000',
-    eta: 'Día siguiente · pedidos antes 18:00',
-    emoji: '🍅',
-  },
 ]
 
 const MENU_ITEMS: { icon: React.ReactNode; label: string; href: string; isExternal?: boolean; tag?: string }[] = [
@@ -736,11 +703,9 @@ export default function HomePage() {
           <div className="section-head">
             <div>
               <span className="section-eye"><IcoTruck size={14} /> Cobertura</span>
-              <h2>Zonas de despacho</h2>
+              <h2>¿Llegamos a tu comuna?</h2>
               <p style={{ color: 'var(--gray-500)', fontSize: 14, marginTop: 8 }}>
-                27 comunas de la Región Metropolitana{' '}
-                <span className="zones-hint-desktop">· Pasa el cursor sobre tu zona para ver los detalles</span>
-                <span className="zones-hint-mobile">· Toca tu zona para ver los detalles</span>
+                Cubrimos 27 comunas de Santiago. Búscala directamente en el mapa.
               </p>
             </div>
           </div>
@@ -749,16 +714,12 @@ export default function HomePage() {
           </div>
           <div className="zones-legend">
             <div className="zl-item">
-              <span className="zl-dot" style={{ background: '#16A34A' }} />
-              Zona Oriente
+              <span className="zl-dot" style={{ background: '#22C55E' }} />
+              Con despacho
             </div>
             <div className="zl-item">
-              <span className="zl-dot" style={{ background: '#DC2626' }} />
-              Norte · Centro · Poniente
-            </div>
-            <div className="zl-item">
-              <span className="zl-dot" style={{ background: '#D97706' }} />
-              Zona Sur
+              <span className="zl-dot" style={{ background: '#94A3B8' }} />
+              Sin cobertura aún
             </div>
             <div className="zl-sep" />
             <div className="zl-price">
