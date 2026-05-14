@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
-import { Inter, Fraunces } from 'next/font/google'
+import { Inter, Fraunces, Dancing_Script } from 'next/font/google'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
 const fraunces = Fraunces({ subsets: ['latin'], variable: '--font-fraunces', display: 'swap' })
+const dancing = Dancing_Script({ subsets: ['latin'], variable: '--font-dancing', display: 'swap', weight: ['700'] })
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://elmenu.cl'
 
@@ -58,7 +59,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es-CL" className={`${inter.variable} ${fraunces.variable}`}>
+    <html lang="es-CL" className={`${inter.variable} ${fraunces.variable} ${dancing.variable}`}>
       <body style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
         {children}
       </body>
