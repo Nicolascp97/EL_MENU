@@ -320,12 +320,14 @@ El agente IA mantiene memoria persistente con decisiones de diseño:
 5. Home dinámica con Supabase + Sección 3 (carrusel productos) + Sección 6 (recetas IA) + cron + admin recetas + 6 recetas en DB
 
 **Siguiente después del Step 8+9:**
-6. Credenciales Transbank producción + test end-to-end en dominio live
-7. Step 7 (Meni chat) — un solo agente para web + WhatsApp vía n8n
-8. OG image (`/public/og-image.png` 1200×630px)
-9. Analytics (Vercel Analytics — 1 línea)
-10. Emails transaccionales (Resend)
-11. Dominio personalizado (elmenu.cl)
+6. **[OPERACIONAL - URGENTE]** Agregar `CRON_SECRET` en Vercel Dashboard → Environment Variables (sin esto el cron de recetas falla con 401)
+7. Credenciales Transbank producción + test end-to-end en dominio live
+8. Step 7 (Meni chat) — un solo agente para web + WhatsApp vía n8n
+9. OG image (`/public/og-image.png` 1200×630px)
+10. Analytics (Vercel Analytics — 1 línea)
+11. Emails transaccionales (Resend)
+12. Dominio personalizado (elmenu.cl)
+13. Página `/recetas/[id]` — detalle de receta con preparación paso a paso (actualmente las recetas no tienen campo `steps`, sería agregar a la tabla y al cron)
 
 ---
 
@@ -348,4 +350,4 @@ Más tarjetas de prueba: https://www.transbankdevelopers.cl/documentacion/como_e
 
 ---
 
-*Documento actualizado tras: home rediseñada (mapa Leaflet + ¿Cómo funciona?), auditoría completa de deploy (build limpio, error pages, SEO, .env.example, español chileno). Commit `ea44e62` — listo para push a Vercel.*
+*Documento actualizado tras: Step 8+9 completado (home dinámica, carrusel productos, recetas IA con 6 recetas en DB, admin recetas, cron Vercel, diseño profesional de RecipesSection). Commits `e774a00`, `<próximo>` — en producción en Vercel.*
