@@ -140,12 +140,19 @@ El proyecto está al **90% del camino a producción**. Toda la funcionalidad cor
 - [ ] Persistir conversaciones en tabla `conversations` (ya existe en DB)
 
 ### 2.4 Mejoras menores
+- [ ] **Activar CallMeBot para notificaciones WhatsApp** — código ya implementado en `/api/transbank/return`, solo falta activar el servicio:
+  1. Celso agrega **+34 644 65 70 34** como contacto en WhatsApp
+  2. Le envía el mensaje exacto: `I allow callmebot to send me messages`
+  3. Recibe una API key por respuesta
+  4. Agregar en Vercel → Settings → Environment Variables: `CALLMEBOT_API_KEY = <key recibida>`
+  5. Hacer Redeploy
+- [ ] **Activar Supabase Site URL** — Authentication → URL Configuration → Site URL = dominio de producción (sin esto los links de confirmación de email se rompen)
 - [ ] **Loading states** en `/catalogo` y `/mayorista` (Suspense + skeleton)
 - [ ] **Analytics** (Vercel Analytics o Google Analytics)
-- [ ] **Email de orden creada** (Resend o Supabase Edge Function) — notificar a Celso
-- [ ] **Página de admin/zonas** — gestión de comunas y precios de despacho desde el panel
+- [x] ~~**Email de orden creada**~~ → reemplazado por notificación WhatsApp vía CallMeBot (implementado en `api/transbank/return/route.ts`)
+- [x] ~~**Página de admin/zonas**~~ → completado: edición inline de precios, mínimos y comunas
 - [ ] **Favoritos** — columna `profiles.favorites UUID[]` existe en DB pero sin UI (defer to v2)
-- [ ] **OG image** — crear `/public/og-image.png` (1200×630px) para redes sociales
+- [x] ~~**OG image**~~ → completado: `public/og-image.png` (1280×720px, generada con Canva IA)
 
 ---
 
