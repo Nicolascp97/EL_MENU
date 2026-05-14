@@ -27,10 +27,10 @@ function norm(s: string): string {
 }
 
 /* ── Layer styles (defined once, never re-created) ───────────────── */
-const S_AVAIL   = { fillColor:'#22C55E', fillOpacity:0.20, color:'#16A34A', weight:1.0, opacity:0.45 }
-const S_UNAVAIL = { fillColor:'#94A3B8', fillOpacity:0.06, color:'#CBD5E1', weight:0.5, opacity:0.30 }
-const S_HOVER   = { fillOpacity:0.38, weight:1.8 }
-const S_HI      = { fillColor:'#16A34A', fillOpacity:0.52, color:'#15803D', weight:2.2, opacity:0.9 }
+const S_AVAIL   = { fillColor:'#22C55E', fillOpacity:0.38, color:'#16A34A', weight:1.5, opacity:0.70 }
+const S_UNAVAIL = { fillColor:'#94A3B8', fillOpacity:0.15, color:'#CBD5E1', weight:0.6, opacity:0.45 }
+const S_HOVER   = { fillOpacity:0.55, weight:2.0 }
+const S_HI      = { fillColor:'#16A34A', fillOpacity:0.62, color:'#15803D', weight:2.5, opacity:0.95 }
 
 const BIZ: [number, number]  = [-33.490, -70.598]
 const CENTER: [number, number] = [-33.47, -70.64]
@@ -133,7 +133,7 @@ export default function ZonesMap() {
           '© <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',
         subdomains: 'abcd',
         maxZoom: 19,
-        opacity: 0.60,
+        opacity: 0.72,
       }).addTo(map)
 
       /* GeoJSON layer */
