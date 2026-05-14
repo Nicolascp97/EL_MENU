@@ -223,17 +223,9 @@ const CSS = `
 
   /* PRODUCERS */
   .producers { display: grid; grid-template-columns: repeat(4,1fr); gap: 18px; }
-  .producer { position: relative; border-radius: var(--radius-lg); overflow: hidden; aspect-ratio: 4/5; padding: 24px; display: flex; flex-direction: column; justify-content: space-between; color: #fff; transition: all .25s ease; box-shadow: var(--shadow-sm); }
+  .producer { position: relative; border-radius: var(--radius-lg); overflow: hidden; aspect-ratio: 4/5; transition: all .25s ease; box-shadow: var(--shadow-sm); }
   .producer:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
-  .producer::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,.06) 1px, transparent 0); background-size: 20px 20px; pointer-events: none; }
-  .producer.q { background: linear-gradient(160deg, #2D6A4F 0%, #1F4B35 100%); }
-  .producer.s { background: linear-gradient(160deg, #52B788 0%, #2D6A4F 100%); }
-  .producer.l { background: linear-gradient(160deg, #74C69D 0%, #2D6A4F 100%); }
-  .producer.c { background: linear-gradient(160deg, #1F4B35 0%, #0F2A1A 100%); }
-  .producer .pin { position: relative; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.85); }
-  .producer .producer-emoji { position: relative; font-size: 64px; line-height: 1; }
-  .producer h3 { position: relative; color: #fff; font-size: 24px; margin-top: 8px; }
-  .producer p { position: relative; font-size: 13px; color: rgba(255,255,255,.78); margin-top: 6px; max-width: 26ch; line-height: 1.4; }
+  .producer-img { padding: 0; background: #1B2B1E; }
 
   /* TESTIMONIALS */
   .testis { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
@@ -982,14 +974,14 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
             </div>
           </div>
           <div className="producers">
-            {HOW_STEPS.map(s => (
-              <article key={s.num} className={`producer ${s.cls}`}>
-                <span className="pin">{s.num}</span>
-                <div>
-                  <div className="producer-emoji">{s.emoji}</div>
-                  <h3>{s.title}</h3>
-                  <p>{s.desc}</p>
-                </div>
+            {HOW_STEPS.map((s, i) => (
+              <article key={s.num} className="producer producer-img">
+                <img
+                  src={`/steps/step${i + 1}.png`}
+                  alt={s.title}
+                  loading="lazy"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
               </article>
             ))}
           </div>
