@@ -125,7 +125,7 @@ export default function ZonesMap() {
             }
             return {
               fillColor:   FILL[zone],
-              fillOpacity: 0.28,
+              fillOpacity: 0.38,
               color:       FILL[zone],
               weight:      1.8,
               opacity:     0.75,
@@ -142,15 +142,23 @@ export default function ZonesMap() {
               className: 'zm-tooltip',
             })
 
+            layer.bindPopup(tooltipHTML(zone), {
+              className: 'zm-popup',
+              closeButton: false,
+              maxWidth: 280,
+            })
+
+            layer.on('click', () => layer.openPopup())
+
             layer.on('mouseover', () =>
               (layer as any).setStyle({
-                fillOpacity: 0.52,
+                fillOpacity: 0.58,
                 weight: 2.5,
               })
             )
             layer.on('mouseout', () =>
               (layer as any).setStyle({
-                fillOpacity: 0.28,
+                fillOpacity: 0.38,
                 weight: 1.8,
               })
             )

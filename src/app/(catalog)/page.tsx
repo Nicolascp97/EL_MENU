@@ -77,7 +77,7 @@ const CSS = `
   .cats-nav { border-bottom: 1px solid var(--gray-200); background: var(--surface); }
   .cats-nav .inner { max-width: 1280px; margin: 0 auto; padding: 12px 24px; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
   .cats-nav .inner::-webkit-scrollbar { display: none; }
-  .cat-pill { flex-shrink: 0; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px; border-radius: 100px; font-size: 13px; font-weight: 500; color: var(--gray-700); background: var(--gray-50); transition: all .15s ease; border: 0; cursor: pointer; }
+  .cat-pill { flex-shrink: 0; display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 100px; font-size: 13px; font-weight: 500; color: var(--gray-700); background: var(--gray-50); transition: all .15s ease; border: 0; cursor: pointer; }
   .cat-pill:hover { background: var(--green-50); color: var(--green-700); }
   .cat-pill.active { background: var(--green-900); color: #fff; }
 
@@ -312,6 +312,8 @@ const CSS = `
   .drawer-foot a { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--green-700); font-weight: 600; padding: 4px 0; }
   .drawer-foot a:hover { color: var(--green-900); }
 
+  .zones-hint-mobile { display: none; }
+
   /* ZONES SECTION */
   .zones-frame { border-radius: var(--radius-xl); overflow: hidden; box-shadow: 0 20px 56px rgba(27,43,30,.09), 0 4px 16px rgba(27,43,30,.05); height: 560px; position: relative; background: #F0F4F0; }
   .zones-frame .leaflet-container { width: 100%; height: 100%; z-index: 1; }
@@ -363,6 +365,20 @@ const CSS = `
     .hero-search-strip { flex-direction: row; padding: 6px; }
     .hero-search-strip button { padding: 0 18px; font-size: 13px; }
     .drawer { width: 88vw; }
+    /* — topbar mobile — */
+    .topbar .links { display: none; }
+    .topbar .inner { justify-content: center; }
+    /* — search strip mobile: icon only — */
+    .hero-search-strip .btn-txt { display: none; }
+    .hero-search-strip button { padding: 0 14px; min-width: 52px; justify-content: center; }
+    /* — hero CTA full width — */
+    .hero-door .door-cta { align-self: stretch; justify-content: center; }
+    /* — cat pills fade indicator — */
+    .cats-nav { position: relative; }
+    .cats-nav::after { content: ''; position: absolute; right: 0; top: 0; bottom: 1px; width: 52px; background: linear-gradient(to right, transparent, white 85%); pointer-events: none; z-index: 1; }
+    /* — zones text mobile — */
+    .zones-hint-desktop { display: none; }
+    .zones-hint-mobile { display: inline; }
   }
   @media (prefers-reduced-motion: reduce) {
     .marquee-track, .typing span { animation: none !important; }
@@ -678,7 +694,7 @@ export default function HomePage() {
                 <span className="door-eye"><IcoStore size={14} /> Para mi negocio</span>
                 <div className="door-emoji">🏪</div>
                 <h2>Precios <em>mayoristas</em> con servicio de oficina.</h2>
-                <p className="door-desc">Restaurantes, almacenes y verdulerías: comprá por caja o bulto con facturación inmediata y crédito a 30 días.</p>
+                <p className="door-desc">Restaurantes, almacenes y verdulerías: compra por caja o bulto con facturación inmediata y crédito a 30 días.</p>
                 <div className="door-meta">
                   <span><span className="chk"><IcoCheck /></span> Precios por caja y volumen</span>
                   <span><span className="chk"><IcoCheck /></span> Factura electrónica al instante</span>
@@ -692,7 +708,7 @@ export default function HomePage() {
           {/* Search strip global */}
           <form className="hero-search-strip" onSubmit={onSearchSubmit} role="search">
             <input type="text" name="q" placeholder="¿Qué buscas hoy? Paltas, tomates, lechugas…" aria-label="Buscar productos" />
-            <button type="submit"><IcoSearch size={16} /> Buscar</button>
+            <button type="submit"><IcoSearch size={16} /><span className="btn-txt"> Buscar</span></button>
           </form>
         </div>
       </section>
@@ -724,7 +740,9 @@ export default function HomePage() {
               <span className="section-eye"><IcoTruck size={14} /> Cobertura</span>
               <h2>Zonas de despacho</h2>
               <p style={{ color: 'var(--gray-500)', fontSize: 14, marginTop: 8 }}>
-                27 comunas de la Región Metropolitana · Pasá el cursor sobre tu zona para ver los detalles
+                27 comunas de la Región Metropolitana{' '}
+                <span className="zones-hint-desktop">· Pasa el cursor sobre tu zona para ver los detalles</span>
+                <span className="zones-hint-mobile">· Toca tu zona para ver los detalles</span>
               </p>
             </div>
           </div>
@@ -893,7 +911,7 @@ export default function HomePage() {
           <div className="newsletter">
             <div>
               <span className="eye"><IcoWa size={14} /> Lista de WhatsApp</span>
-              <h2>Recibí las ofertas de la semana directo a tu WhatsApp.</h2>
+              <h2>Recibe las ofertas de la semana directo a tu WhatsApp.</h2>
               <p>Un solo mensaje los lunes con lo de temporada, descuentos exclusivos y novedades. Sin spam, puedes darte de baja cuando quieras.</p>
             </div>
             <NewsletterForm />
