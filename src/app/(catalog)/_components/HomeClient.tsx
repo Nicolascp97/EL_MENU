@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { UserRole, Product, Recipe } from '@/types/database'
 import dynamic from 'next/dynamic'
 import { useCart } from '@/hooks/useCart'
+import { useChatStore } from '@/hooks/useChatStore'
 import RecipesSection from './RecipesSection'
 
 const ZonesMap = dynamic(() => import('@/components/ZonesMap'), { ssr: false })
@@ -558,6 +559,20 @@ function NewsletterForm() {
   )
 }
 
+/* ── OPEN CHAT BUTTON ─────────────────────────────── */
+function OpenChatButton() {
+  const { openChat } = useChatStore()
+  return (
+    <button
+      onClick={openChat}
+      className="btn-primary"
+      style={{ background: 'var(--warm)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+    >
+      <IcoBot size={18} /> Hablar con Meni
+    </button>
+  )
+}
+
 /* ── MAIN PAGE ────────────────────────────────────── */
 export default function HomeClient({ featuredProducts, recipes }: { featuredProducts: Product[]; recipes: Recipe[] }) {
   const router = useRouter()
@@ -891,8 +906,8 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
                   {[
                     '"Hazme una caja para ensaladas de la semana" — listo.',
                     'Sugiere sustitutos cuando hay stock limitado.',
-                    'Recuerda tu dirección, zona y preferencias.',
-                    'Atiende 24/7 por chat, WhatsApp o voz.',
+                    'Pide desde la web sin crear cuenta, en segundos.',
+                    'Conoce el stock en tiempo real y te guía al checkout.',
                   ].map(f => (
                     <div key={f} className="ai-feat">
                       <span className="chk"><IcoCheck /></span> {f}
@@ -900,18 +915,7 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
                   ))}
                 </div>
                 <div style={{ display: 'flex', gap: 12, marginTop: 32, flexWrap: 'wrap' }}>
-                  {/* TODO Step 7: este botón debe abrir el ChatModal de Meni.
-                      Mientras no exista, manda a WhatsApp con un mensaje pre-cargado. */}
-                  <a
-                    href="https://wa.me/56954952395?text=Hola%20Meni!%20Necesito%20armar%20un%20pedido"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn-primary"
-                    style={{ background: 'var(--warm)' }}
-                  >
-                    <IcoBot size={18} /> Chatear con el asistente
-                  </a>
-                  <a href="https://wa.me/56954952395" target="_blank" rel="noopener noreferrer" className="btn-ghost" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.3)' }}><IcoWa /> Pedir por WhatsApp</a>
+                  <OpenChatButton />
                 </div>
               </div>
               <div className="chat">

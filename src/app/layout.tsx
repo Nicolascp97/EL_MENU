@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter, Fraunces, Dancing_Script } from 'next/font/google'
 import './globals.css'
+import ChatWidget from '@/components/chat/ChatWidget'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' })
 const fraunces = Fraunces({ subsets: ['latin'], variable: '--font-fraunces', display: 'swap' })
@@ -62,6 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es-CL" className={`${inter.variable} ${fraunces.variable} ${dancing.variable}`}>
       <body style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
         {children}
+        <ChatWidget />
       </body>
     </html>
   )

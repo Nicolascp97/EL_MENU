@@ -1,13 +1,13 @@
 # El Menú — Estado del Proyecto
 
-> Última actualización: **2026-05-14** (Step 8+9 completado: home dinámica + carrusel productos + recetas IA en DB + admin recetas + cron Vercel)
-> Stack: Next.js 16 (App Router, Turbopack) · TypeScript · Tailwind v4 · Supabase (PG + Auth + Storage + Realtime) · Anthropic Claude · Kie.ai (imágenes) · Transbank Webpay · Vercel
+> Última actualización: **2026-05-14** (Step 7 completado: Meni chat IA web + admin rediseñado + notificaciones WhatsApp + OG image)
+> Stack: Next.js 16 (App Router, Turbopack) · TypeScript · Tailwind v4 · Supabase (PG + Auth + Storage + Realtime) · Anthropic Claude Sonnet 4.6 · Kie.ai (imágenes) · Transbank Webpay · Vercel
 
 ---
 
 ## Resumen ejecutivo
 
-El proyecto está al **90% del camino a producción**. Toda la funcionalidad core está terminada y el build compila limpio (0 errores TypeScript, 0 warnings). El código está commiteado y listo para hacer push a GitHub y conectar a Vercel. Lo único que falta para el MVP es el **deploy en sí** (push + env vars + dominio), y opcionalmente el **agente IA Meni** como diferenciador.
+El proyecto está al **97% del camino a producción**. Toda la funcionalidad core + diferenciadores están terminados. El build compila limpio (0 errores TypeScript). Lo único que falta para salir live son **3 pasos operacionales** que dependen de Celso: credenciales Transbank producción, activar CallMeBot, y apuntar el dominio.
 
 ---
 
@@ -27,191 +27,171 @@ El proyecto está al **90% del camino a producción**. Toda la funcionalidad cor
 - Precios minorista + mayorista cuando aplica
 - Bandera `wholesale_only` para cajas/sacos/mallas grandes que solo van a /mayorista
 - 25 productos marcados `featured = true` (sección Ofertas)
-- Fuente: `tabla-productos-minoristras.md` + `tabla-productos-mayoristas.md` (archivos en la raíz del proyecto)
-- Zona única "Santiago" con 21 comunas, despacho $2.990, mínimo minorista $20.000 / mayorista $60.000
+- Zona única "Santiago" con 27 comunas, despacho $2.990, mínimo minorista $20.000 / mayorista $60.000
 
 ### 1.3 Imágenes IA — 185 imágenes
 - Generadas con **Kie.ai · nano-banana-2** (Google Gemini 2.5 Flash Image)
 - 2 fondos coherentes: **crema marfil `#F5EFE0`** (minorista) y **arena tibio `#E8DCC4`** (mayorista)
-- Convención: `products.images[0]` = bg minorista, `images[1]` = bg mayorista (cuando aplica)
-- ProductCard elige el slot correcto según `wholesaleMode`
 - Script reutilizable: [`scripts/generate-product-images.mjs`](scripts/generate-product-images.mjs)
-- Script de rescate para tasks huérfanas: [`scripts/import-orphan-image.mjs`](scripts/import-orphan-image.mjs)
 
 ### 1.4 Catálogos visuales
 - **`/catalogo`** (público, retail): hero verde, todos pueden comprar
-- **`/mayorista`** (público para ver): hero dorado, solo `role=mayorista|admin` puede comprar — para anónimos/minoristas muestra pill "🔒 Solo empresas" y banner "Regístrate como empresa"
-- `CatalogModeTabs` sticky para alternar
-- `CategoryStrip` con cards grandes (emoji 56px + count por categoría)
-- Sección virtual **🏷️ Ofertas** (filtra productos cuyo nombre contiene "oferta")
-- Banners contextuales según rol (cross-sell mayorista → minorista, etc)
+- **`/mayorista`** (público para ver): hero dorado, solo `role=mayorista|admin` puede comprar
+- `CatalogModeTabs` sticky, `CategoryStrip`, sección virtual Ofertas, banners contextuales por rol
 
 ### 1.5 Buscador
-- Normalización de acentos (escribes "limon" → matchea "Limón")
-- Búsqueda sobre nombre + descripción + categoría
-- Sincronización con URL (`/catalogo?q=tomate&cat=verduras`) con debounce 300ms — links compartibles
-- Botón ✕ para limpiar
-- Funciona desde search bar del home Y desde el hero de cada catálogo
+- Normalización de acentos ("limon" → matchea "Limón")
+- Búsqueda sobre nombre + descripción + categoría con debounce 300ms
+- Sincronización con URL (`?q=tomate&cat=verduras`) — links compartibles
 
 ### 1.6 Auth y registro mayorista
-- **`/mayorista/login`** — email + password, signInWithPassword, redirige a `?next=…`
-- **`/mayorista/registro`** — email/password/nombre/teléfono, `signUp({ data: { role: 'mayorista' } })`, handle confirmación de email
-- **`src/proxy.ts`** corre en todas las rutas (refresh de tokens Supabase) y redirige `/admin` + `/mi-cuenta` si no hay sesión
-- **`src/app/admin/layout.tsx`** chequea `profile.role === 'admin'` (autorización a nivel de layout)
-- **`UserMenu`** dropdown con perfil, rol (badge color-coded), links contextuales, **logout** vía Server Action `signOutAction`
-- **`/mi-cuenta`** con datos personales + lista de pedidos + botón cerrar sesión
+- `/mayorista/login` + `/mayorista/registro`
+- `src/proxy.ts` middleware de sesiones + guards de rutas
+- `UserMenu` con perfil, rol, logout vía Server Action
+- `/mi-cuenta` con datos personales + lista de pedidos
 
 ### 1.7 Home rediseñada ✅
-- **Mapa interactivo Leaflet** con CartoDB Positron — sistema binario verde/gris
-  - Verde (`#22C55E`) = 27 comunas con despacho · Gris (`#94A3B8`) = sin cobertura
-  - GeoJSON local: `public/comunal-rm.geojson` (GADM, 52 comunas RM, ~92KB) — sin dependencia externa
-  - Barra de búsqueda con autocomplete glassmorphism + flyTo a la comuna buscada
-  - Popup al tocar/hover: nombre comuna, "✓ Hacemos despacho aquí", "$2.990 · Mínimo $20.000"
-  - Toggle "Ver las 27 comunas ▼" bajo el mapa → grilla expandible (4 col desktop, 2 col mobile)
-  - Sin tarjeta de tienda overlay (se eliminó para que el mapa se vea completo)
-  - `norm()` stripea espacios además de diacríticos — crítico porque GADM usa "ElBosque" sin espacios
-- **Sección "¿Cómo funciona?"** — 4 pasos animados
-- Topbar con Dancing Script, Navbar móvil con drawer izquierdo, sin carrito en home
-- **IMPORTANTE:** El home (`(catalog)/page.tsx`) es un Client Component gigante (~950 líneas) con `const CSS` string. TODO el CSS del home va dentro de ese string, no en globals.css ni Tailwind.
-- **Secciones 3 y 6 del JSX no existen aún** (el numerado salta 2→4 y 5→7) — se construirán en Step 9
+- **Mapa interactivo Leaflet** — 27 comunas verdes, GeoJSON local, búsqueda con autocomplete
+- Sección "¿Cómo funciona?", carrusel productos destacados, recetas IA
+- Sección Meni actualizada: botón "Hablar con Meni" abre el chat web directamente (no redirige a WhatsApp)
+- **IMPORTANTE:** Todo el CSS del home va en el string `const CSS` de `HomeClient.tsx`, no en globals.css
 
 ### 1.8 Checkout con Transbank Webpay Plus ✅
-- `transbank-sdk@6.1.1` instalado
-- `src/lib/transbank.ts` con `createWebpayPlus()` — usa credenciales de integración por default; cuando `TRANSBANK_ENVIRONMENT=production` exige variables de producción
-- `POST /api/checkout` — recalcula precios server-side según rol, valida stock + comuna + mínimo, crea `order`, inicia transacción Transbank
-- `GET/POST /api/transbank/return` — commit de transacción, actualiza `payment_status`, redirige a `/checkout/confirmacion`
-- `/checkout/page.tsx` — prefill con datos del perfil; `CheckoutClient.tsx` con form + `OrderSummary.tsx` con totales dinámicos por zona y validación de mínimo
+- `transbank-sdk@6.1.1`, `src/lib/transbank.ts` con toggle integration/production
+- `POST /api/checkout` — recalcula precios server-side, valida stock + comuna + mínimo, crea orden
+- `GET/POST /api/transbank/return` — commit, actualiza `payment_status`, notifica WhatsApp, redirige
 
-### 1.9 Detalle de pedido ✅
-- `/pedido/[id]/page.tsx` — control de acceso (dueño o admin), muestra items, totales, estado, CTAs
+### 1.9 Notificación WhatsApp al pago exitoso ✅
+- Implementado en `/api/transbank/return/route.ts` con **CallMeBot** (API gratuita)
+- Mensaje al local: pedido ID, total, teléfono cliente, dirección, lista de productos
+- Variable de entorno: `CALLMEBOT_API_KEY` (pendiente activación por Celso — ver sección 2.1)
 
-### 1.10 Deploy-ready ✅ (nuevo)
-- **Build limpio**: `npm run build` → 0 errores TypeScript, 0 warnings, 14 rutas generadas
-- **`src/app/error.tsx`** — página de error con marca + "Intentar nuevamente" + "Volver al inicio"
-- **`src/app/not-found.tsx`** — 404 con marca y link al catálogo
-- **`src/app/layout.tsx`** — metadata completa: `metadataBase`, `title template`, `description`, `openGraph`, `twitter`, `icons`, `robots`
-- **`.env.example`** — documenta las 11 variables de entorno sin exponer secretos
-- **`next.config.ts`** — `poweredByHeader: false` (no exponer versión Next.js en headers HTTP)
-- **`.gitignore`** — corregido para no excluir `.env.example` pero sí `.env.local` y `.env.production`
-- **Todo el copy en español chileno** — eliminado todo el voceo argentino (vos/podés/tenés/Registrate) en los 7 archivos donde aparecía
+### 1.10 Admin panel rediseñado ✅
+- **Sidebar oscuro** (`#1B2B1E`) con nav activo, avatar, "Ver sitio", logout
+- **Dashboard de pedidos**: KPI strip (pedidos hoy, ingresos, ticket promedio, urgentes), pipeline kanban 4 columnas, badge EN VIVO con animación, EmptyState ilustrado
+- **`/admin/zonas`**: edición inline de precios, mínimos y comunas con flash feedback
+- **`/admin/recetas`**: toggle active/inactive, regenerar con IA, badge "última generación"
+- **`/admin/productos`**: gestión de nombre/precio/stock/imagen
+- Sidebar como Client Component separado (`AdminSidebar.tsx`) para usar `usePathname()`
+- Nav items: Pedidos · Productos · Zonas · Recetas IA
 
-### 1.11 Admin
-- `/admin` — listado de pedidos en tiempo real con Supabase Realtime (badge por estado, filtro)
-- `/admin/productos` — gestión de productos con edición de nombre/precio/stock/imagen
+### 1.11 OG Image ✅
+- `public/og-image.png` — 1280×720px generada con Canva IA (design ID: DAHJqVE6Z3E)
+- Conectada en `layout.tsx` → `openGraph.images` y `twitter.images`
+
+### 1.12 Step 7 — Meni, agente IA de chat web ✅ COMPLETADO
+
+**Arquitectura:** endpoint REST + tool use loop (max 5 iteraciones) + Zustand global para estado del chat.
+
+**Archivos creados:**
+- `src/app/api/chat/route.ts` — endpoint POST, sistema prompt Meni, 3 herramientas Anthropic:
+  - `buscar_productos`: búsqueda ilike con retry de plural→singular (`limones`→`limon`)
+  - `ver_zonas`: devuelve comunas y precios de despacho
+  - `agregar_al_carrito`: acumula items y los resuelve a `Product` completo al final
+  - Devuelve `{ message, products?, addedToCart? }`
+- `src/hooks/useChatStore.ts` — Zustand global `{ isOpen, openChat, closeChat }` compartido entre componentes
+- `src/hooks/useChat.ts` — mensajes, isLoading, sendMessage con useRef para stale closure; soporte de `displayText` (texto visual vs texto enviado a API)
+- `src/components/chat/ChatWidget.tsx` — FAB 🥦 + modal 380×560px desktop / full-screen mobile:
+  - Tarjetas de producto **clickeables** (botón `+ Agregar`): agrega al carrito inmediatamente, envía `[seleccionó: nombre]` a la API
+  - Emoji lookup por nombre de producto (35 patrones: 🍅 tomate, 🥑 palta, 🧄 ajo, etc.)
+  - Badge "✓ Agregado al carrito" con unidad legible (`"1 kg"` → `"kg"`)
+  - Oculto en rutas `/admin*`
+  - Bienvenida automática al abrir por primera vez
+
+**Integración en el home:**
+- `HomeClient.tsx` importa `useChatStore` → botón "Hablar con Meni" llama `openChat()`
+- Sin redirección a WhatsApp
+
+**System prompt de Meni:**
+- Formato de respuesta conversacional con bullets (no tablas markdown)
+- Búsqueda en singular con tilde: "limón" no "limones"
+- Manejo de selección por tarjeta: no re-agrega al carrito si viene `[seleccionó:]`
+
+### 1.13 Deploy ✅
+- Repo en GitHub: `Nicolascp97/EL_MENU` · rama `master`
+- Vercel conectado con auto-deploy en push a master
+- Env vars cargadas en Vercel Dashboard
+- Build: 0 errores TypeScript, ~20 rutas generadas
 
 ---
 
 ## 2. Lo que falta para producción ⏳
 
-### 2.1 Step 10 — Deploy ✅ COMPLETADO
-- Repo en GitHub: `Nicolascp97/EL_MENU` · rama `master`
-- Vercel conectado y con deploy activo (commit `98b3e02` en producción)
-- Env vars cargadas en Vercel Dashboard
-- **Pendiente aún:** dominio personalizado, credenciales Transbank producción, test end-to-end en prod
+### 2.1 Pendientes operacionales (dependen de Celso)
 
-### 2.2 Step 8 + Step 9 — Recetas IA + Home dinámica ✅ COMPLETADO
+#### Activar notificaciones WhatsApp — CallMeBot
+El código está implementado. Solo falta activar el servicio:
+1. Celso agrega **+34 644 65 70 34** como contacto en WhatsApp
+2. Le envía el mensaje exacto: `I allow callmebot to send me messages`
+3. Recibe una API key por respuesta automática
+4. Agregar en Vercel → Settings → Environment Variables: `CALLMEBOT_API_KEY = <key recibida>`
+5. Hacer Redeploy
 
-**Archivos creados/modificados:**
-- `src/app/(catalog)/page.tsx` ← Server wrapper async (pre-fetcha featured + recipes)
-- `src/app/(catalog)/_components/HomeClient.tsx` ← Client Component (era page.tsx)
-- `src/app/(catalog)/_components/RecipesSection.tsx` ← Client Component con useCart
-- `src/app/api/cron/generar-recetas/route.ts` ← cron Bearer auth, usa claude-sonnet-4-6
-- `src/app/api/admin/trigger-recipes/route.ts` ← proxy seguro admin
-- `src/app/admin/recetas/page.tsx` ← gestión editorial + toggle + regenerar
-- `vercel.json` ← cron lunes 6 AM `0 6 * * 1`
+#### Transbank producción
+- [ ] Celso entrega `TRANSBANK_COMMERCE_CODE` + `TRANSBANK_API_KEY_SECRET` reales
+- [ ] Agregar en Vercel env vars + `TRANSBANK_ENVIRONMENT=production`
+- [ ] Probar flujo completo con tarjeta real en dominio live antes de anunciar
 
-**DB:** 6 recetas insertadas con product_ids reales:
-🥗 Ensalada Primavera con Palta · 🥦 Crema de Brócoli con Almendras · 🥤 Jugo Verde Detox · 🍲 Cazuela de Porotos · 🫘 Ensalada de Garbanzos · 🥭 Smoothie Tropical
+#### Supabase Site URL
+- [ ] Supabase Dashboard → Authentication → URL Configuration → **Site URL** = dominio final
+- Sin esto, los links de confirmación de email apuntan a localhost
 
-**Pendiente operacional:** Agregar `CRON_SECRET` en Vercel Dashboard → Environment Variables.
+#### Dominio
+- [ ] Apuntar `elmenu.cl` a Vercel (DNS → CNAME a `cname.vercel-dns.com`)
+- [ ] Vercel → Settings → Domains → agregar dominio
 
-### 2.3 Step 7 — Chat Meni (diferenciador, no bloqueante)
-**Estimado:** 2 días
-
-**Arquitectura aprobada:** Un solo endpoint `/api/chat/route.ts` sirve a dos clientes:
-- **Web:** `ChatWidget.tsx` llama directamente al endpoint
-- **WhatsApp:** WhatsApp Business API → n8n → mismo `/api/chat` endpoint
-
-- [ ] `/api/chat/route.ts` — streaming con Anthropic SDK, system prompt de Meni, tools para consultar productos/zonas/crear pedidos
-- [ ] `src/hooks/useChat.ts` — estado de mensajes, isOpen, isLoading
-- [ ] `src/components/chat/ChatWidget.tsx` + `ChatModal.tsx`
-- [ ] Integrar en layout; cambiar botón home WhatsApp → ChatModal
-- [ ] `/api/webhook/whatsapp/route.ts` — mismo sistema vía n8n
-- [ ] Persistir conversaciones en tabla `conversations` (ya existe en DB)
-
-### 2.4 Mejoras menores
-- [ ] **Activar CallMeBot para notificaciones WhatsApp** — código ya implementado en `/api/transbank/return`, solo falta activar el servicio:
-  1. Celso agrega **+34 644 65 70 34** como contacto en WhatsApp
-  2. Le envía el mensaje exacto: `I allow callmebot to send me messages`
-  3. Recibe una API key por respuesta
-  4. Agregar en Vercel → Settings → Environment Variables: `CALLMEBOT_API_KEY = <key recibida>`
-  5. Hacer Redeploy
-- [ ] **Activar Supabase Site URL** — Authentication → URL Configuration → Site URL = dominio de producción (sin esto los links de confirmación de email se rompen)
+### 2.2 Pendientes técnicos menores
+- [ ] **`CRON_SECRET`** en Vercel env vars (sin esto el cron de recetas falla con 401)
 - [ ] **Loading states** en `/catalogo` y `/mayorista` (Suspense + skeleton)
-- [ ] **Analytics** (Vercel Analytics o Google Analytics)
-- [x] ~~**Email de orden creada**~~ → reemplazado por notificación WhatsApp vía CallMeBot (implementado en `api/transbank/return/route.ts`)
-- [x] ~~**Página de admin/zonas**~~ → completado: edición inline de precios, mínimos y comunas
-- [ ] **Favoritos** — columna `profiles.favorites UUID[]` existe en DB pero sin UI (defer to v2)
-- [x] ~~**OG image**~~ → completado: `public/og-image.png` (1280×720px, generada con Canva IA)
+- [ ] **Analytics** (Vercel Analytics — 1 línea de código)
+- [ ] **Emails transaccionales** (Resend) — orden confirmada al cliente (opcional para MVP)
+
+### 2.3 Diferido a v2
+- Favoritos (columna `profiles.favorites UUID[]` ya existe en DB, falta UI)
+- Página `/recetas/[id]` con pasos de preparación (requiere columna `steps` en tabla)
+- WhatsApp vía n8n → mismo `/api/chat` endpoint (webhook placeholder ya existe)
+- Persistir conversaciones de Meni en tabla `conversations`
 
 ---
 
-## 3. Checklist pre-producción
+## 3. Checklist pre-lanzamiento
 
-### 3.1 Supabase (consola supabase.com)
-- [ ] Auth → Providers → Email → **Confirm email**: decidir ON (seguro) o OFF (más ágil para testing)
-- [ ] Auth → URL Configuration → **Site URL** = dominio final
-- [ ] Auth → Email Templates → personalizar con marca El Menú (opcional)
-- [ ] Settings → Database → Backups: verificar daily backup habilitado
+### 3.1 Supabase
+- [ ] Auth → **Site URL** = dominio final
+- [ ] Auth → Confirm email: ON (seguro) o OFF (más ágil para lanzamiento)
+- [ ] Settings → Database → Backups: daily backup habilitado
 
 ### 3.2 Primer usuario admin
-1. Regístrate como mayorista desde `/mayorista/registro` con el email de Celso
-2. Confirma email si está ON
-3. Sube el rol manualmente en Supabase SQL Editor:
-   ```sql
-   UPDATE profiles SET role = 'admin' WHERE id = (
-     SELECT id FROM auth.users WHERE email = 'celso@email.cl'
-   );
-   ```
+```sql
+UPDATE profiles SET role = 'admin' WHERE id = (
+  SELECT id FROM auth.users WHERE email = 'celso@email.cl'
+);
+```
 
-### 3.3 Transbank
-- [ ] Verificar credenciales de **producción** con Celso
-- [ ] `TRANSBANK_COMMERCE_CODE` + `TRANSBANK_API_KEY_SECRET` en env vars de Vercel
-- [ ] `TRANSBANK_ENVIRONMENT=production` en Vercel (Preview puede quedar en `integration`)
-- [ ] Probar con tarjeta de integración antes de live
-
-### 3.4 Pruebas de aceptación (flujo completo)
-- [ ] Visitante anónimo: ve `/`, `/catalogo`, `/mayorista` con imágenes correctas
-- [ ] Mayorista nuevo: registro → confirmación email → login → precios mayoristas → checkout → pago aprobado
-- [ ] Admin: login → `/admin` → ve pedidos en tiempo real → `/admin/productos` → edita producto
-- [ ] Mapa Leaflet carga en home con zonas coloreadas y tooltip al hover
+### 3.3 Pruebas de aceptación
+- [ ] Visitante anónimo: ve `/`, `/catalogo`, `/mayorista`, usa Meni
+- [ ] Meni encuentra productos, los agrega al carrito, guía al checkout
+- [ ] Mayorista: registro → login → precios mayoristas → checkout → pago
+- [ ] Pago exitoso → notificación WhatsApp al +56954952395
+- [ ] Admin: pedidos en tiempo real, edición de productos, zonas, recetas
 
 ---
 
 ## 4. Variables de entorno
 
-### 4.1 Configuradas en `.env.local` (dev)
-| Variable | Para qué |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key (cliente browser) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role (bypass RLS, server-only) |
-| `ANTHROPIC_API_KEY` | Claude API para Meni (Step 7+) |
-| `NEXT_PUBLIC_WA_NUMBER` | Número WhatsApp Celso (`56954952395`) |
-| `NEXT_PUBLIC_APP_URL` | URL base de la app (`http://localhost:3000` en dev) |
-| `TRANSBANK_ENVIRONMENT` | `integration` en dev, `production` en prod |
-| `TRANSBANK_COMMERCE_CODE` | Código comercio (integración usa default del SDK) |
-| `TRANSBANK_API_KEY_SECRET` | Secret (integración usa default del SDK) |
-| `N8N_WEBHOOK_BASE_URL` | URL base del n8n (para Step 7) |
-| `N8N_WEBHOOK_SECRET` | Secret para validar webhooks (para Step 7) |
-
-> Ver `.env.example` en la raíz del proyecto para la lista completa con descripciones.
-
-### 4.2 Adicionales para producción
-| Variable | Para qué | Cuándo |
+| Variable | Para qué | Estado |
 |---|---|---|
-| `CRON_SECRET` | Token bearer para `/api/cron/*` | Step 8 |
-| `RESEND_API_KEY` *(opcional)* | Envío de emails transaccionales | mejora |
+| `NEXT_PUBLIC_SUPABASE_URL` | URL proyecto Supabase | ✅ |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key (browser) | ✅ |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role (server) | ✅ |
+| `ANTHROPIC_API_KEY` | Claude API para Meni | ✅ en uso |
+| `NEXT_PUBLIC_WA_NUMBER` | WhatsApp Celso (`56954952395`) | ✅ |
+| `NEXT_PUBLIC_APP_URL` | URL base de la app | ✅ |
+| `CRON_SECRET` | Bearer para `/api/cron/*` | ⏳ agregar en Vercel |
+| `CALLMEBOT_API_KEY` | Notificaciones WhatsApp al local | ⏳ pendiente activación |
+| `TRANSBANK_ENVIRONMENT` | `integration` dev / `production` prod | ⏳ cambiar a production |
+| `TRANSBANK_COMMERCE_CODE` | Código comercio producción | ⏳ Celso lo entrega |
+| `TRANSBANK_API_KEY_SECRET` | Secret Transbank producción | ⏳ Celso lo entrega |
 
 ---
 
@@ -219,142 +199,88 @@ El proyecto está al **90% del camino a producción**. Toda la funcionalidad cor
 
 ```
 elmenu-app/
-├── ESTADO-DEL-PROYECTO.md          ← este documento
-├── AGENTS.md                        ← reglas para agentes IA (Next 16, no usar convenciones viejas)
-├── .env.example                     ← plantilla de variables de entorno (commiteado, sin secretos)
-├── tabla-productos-minoristras.md   ← fuente del seed minorista
-├── tabla-productos-mayoristas.md    ← fuente del seed mayorista
-├── next.config.ts                   ← Turbopack root + remotePatterns + poweredByHeader:false
+├── ESTADO-DEL-PROYECTO.md
+├── AGENTS.md                        ← reglas para agentes IA (Next 16)
+├── .env.example                     ← plantilla sin secretos (commiteado)
+├── vercel.json                      ← cron lunes 6 AM para recetas
 ├── src/
-│   ├── proxy.ts                     ← guard /admin y /mi-cuenta (renombrado de middleware en Next 16)
+│   ├── proxy.ts                     ← middleware: refresh sesiones + guard rutas
 │   ├── app/
-│   │   ├── layout.tsx               ← metadata completa (OG, Twitter, favicon, robots)
-│   │   ├── error.tsx                ← página de error con marca
-│   │   ├── not-found.tsx            ← 404 con marca
-│   │   ├── (catalog)/page.tsx       ← HOME (mock data — pendiente Step 9)
-│   │   ├── catalogo/page.tsx        ← Catálogo minorista público
+│   │   ├── layout.tsx               ← metadata OG + ChatWidget global
+│   │   ├── (catalog)/
+│   │   │   ├── page.tsx             ← Server wrapper (pre-fetcha featured + recipes)
+│   │   │   └── _components/
+│   │   │       ├── HomeClient.tsx   ← home completa (~1000 líneas, CSS en string const)
+│   │   │       └── RecipesSection.tsx
+│   │   ├── catalogo/page.tsx
 │   │   ├── mayorista/
-│   │   │   ├── page.tsx             ← Catálogo mayorista (compra condicionada por rol)
-│   │   │   ├── login/page.tsx
-│   │   │   └── registro/page.tsx
-│   │   ├── mi-cuenta/page.tsx       ← Perfil + pedidos + logout
+│   │   ├── mi-cuenta/page.tsx
 │   │   ├── admin/
-│   │   │   ├── layout.tsx           ← role check === 'admin'
-│   │   │   ├── page.tsx             ← pedidos en tiempo real (Supabase Realtime)
-│   │   │   └── productos/page.tsx   ← gestión de productos
-│   │   ├── auth/actions.ts          ← signOutAction (Server Action)
-│   │   ├── checkout/
-│   │   │   ├── page.tsx             ← prefill con datos del perfil
-│   │   │   └── confirmacion/page.tsx
-│   │   ├── pedido/[id]/page.tsx     ← detalle de pedido (control de acceso)
+│   │   │   ├── layout.tsx           ← role check + AdminSidebar
+│   │   │   ├── _components/AdminSidebar.tsx  ← Client Component con usePathname()
+│   │   │   ├── page.tsx             ← KPI + kanban pedidos (Realtime)
+│   │   │   ├── productos/page.tsx
+│   │   │   ├── zonas/page.tsx       ← edición inline comunas + precios
+│   │   │   └── recetas/page.tsx     ← toggle + regenerar IA
 │   │   └── api/
-│   │       ├── checkout/route.ts    ← crea orden + inicia Transbank
-│   │       ├── transbank/return/    ← commit + actualiza payment_status
-│   │       └── webhook/whatsapp/    ← placeholder para n8n (Step 7)
+│   │       ├── chat/route.ts        ← Meni: tool use loop (buscar/zonas/carrito)
+│   │       ├── checkout/route.ts
+│   │       ├── transbank/return/    ← commit + CallMeBot WhatsApp
+│   │       ├── cron/generar-recetas/
+│   │       ├── admin/trigger-recipes/
+│   │       └── webhook/whatsapp/    ← placeholder n8n (v2)
 │   ├── components/
-│   │   ├── ZonesMap.tsx             ← mapa Leaflet interactivo (ssr:false, CartoDB Positron)
-│   │   ├── auth/UserMenu.tsx
-│   │   ├── catalog/
-│   │   │   ├── Navbar.tsx
-│   │   │   ├── CatalogClient.tsx    ← orquestador (filtros, grid)
-│   │   │   ├── CatalogHero.tsx      ← hero por modo + banner contextual
-│   │   │   ├── CatalogModeTabs.tsx  ← tabs Minorista | Mayorista
-│   │   │   ├── CategoryStrip.tsx    ← cards grandes de categorías
-│   │   │   ├── ProductCard.tsx      ← card con imagen, precio, badge
-│   │   │   └── CartDrawer.tsx
-│   │   ├── admin/
-│   │   │   ├── OrdersRealtimeClient.tsx
-│   │   │   └── ProductsAdminClient.tsx
-│   │   └── checkout/
-│   │       ├── CheckoutClient.tsx
-│   │       └── OrderSummary.tsx
-│   ├── hooks/useCart.ts             ← zustand + persist localStorage
+│   │   ├── chat/ChatWidget.tsx      ← FAB + modal + tarjetas clickeables
+│   │   ├── ZonesMap.tsx
+│   │   ├── catalog/…
+│   │   ├── admin/…
+│   │   └── checkout/…
+│   ├── hooks/
+│   │   ├── useCart.ts               ← Zustand + persist localStorage
+│   │   ├── useChat.ts               ← mensajes + sendMessage con displayText
+│   │   └── useChatStore.ts          ← Zustand global isOpen/openChat/closeChat
 │   ├── lib/
 │   │   ├── supabase/{client,server,admin}.ts
-│   │   ├── transbank.ts             ← wrapper Webpay Plus con toggle integration/production
-│   │   └── utils.ts                 ← cn, formatPrice, slugify
-│   └── types/database.ts            ← tipos de todas las tablas
-├── supabase/
-│   ├── schema.sql                   ← esquema base
-│   ├── seed.sql                     ← 144 productos + zona + 8 categorías
-│   └── migrations/ (4 archivos)
-├── scripts/
-│   ├── generate-product-images.mjs  ← Kie.ai → Supabase Storage → DB
-│   └── import-orphan-image.mjs      ← rescatar tareas huérfanas pagas
-└── public/
-    ├── logo/{elmenu-color,elmenu-white}.png
-    └── placeholders/default.svg
+│   │   ├── transbank.ts
+│   │   └── utils.ts
+│   └── types/database.ts
+├── public/
+│   ├── og-image.png                 ← 1280×720px Canva IA
+│   ├── comunal-rm.geojson           ← 52 comunas RM para Leaflet
+│   └── logo/
+└── scripts/
+    ├── generate-product-images.mjs
+    └── import-orphan-image.mjs
 ```
 
 ---
 
-## 6. Memorias del proyecto (en `.claude/`)
+## 6. Cómo probar checkout end-to-end (dev local)
 
-El agente IA mantiene memoria persistente con decisiones de diseño:
+1. `npm run dev` → `http://localhost:3000/catalogo`
+2. Agregar productos por al menos **$20.000**
+3. Carrito → Pagar → `/checkout` → completar form
+4. Tarjeta de integración Transbank:
+   - **Número:** `4051 8856 0000 0044`
+   - **CVV:** `123` · **Venc:** `11/27` · **RUT:** `11.111.111-1` · **Clave:** `123`
+5. Confirmación → `/checkout/confirmacion?status=success`
 
-- `project_lalista_urls.md` — URLs públicas de Celso en lalista.de
-- `project_seed_strategy.md` — cómo se mapean precios, featured, unidades
-- `project_catalog_modes.md` — lógica de canPurchase y banners por rol
-- `project_social_urls.md` — Instagram, Facebook, WhatsApp, mail oficiales
-- `project_pending_tasks.md` — tareas pendientes de steps anteriores
+Para cancelación: "Anular compra" en Transbank → `status=cancelled`
+Para error: CVV `000` → `status=failed`
 
 ---
 
-## 7. Costos mensuales estimados en producción
+## 7. Costos mensuales estimados
 
 | Servicio | Costo | Notas |
 |---|---:|---|
-| Vercel Pro | $20/mes | Necesario para cron (Step 8); Free alcanza para MVP |
-| Supabase Free → Pro | $0–25/mes | Free alcanza para arrancar; Pro recomendado >100 usuarios |
-| Anthropic Claude API | ~$10–50/mes | Pay-as-you-go según uso del chat Meni |
-| Transbank | variable | Comisión por transacción (Celso ya paga) |
-| n8n cloud (opcional) | $20/mes | Si no, self-hosted gratis en VPS |
-| Kie.ai (imágenes) | one-time | Solo para productos nuevos (~$0.06/imagen) |
-| Dominio | $10–20/año | .cl o .com |
-| **Total fijo** | **~$50–115/mes** | Sin contar Transbank ni Kie.ai |
+| Vercel Pro | $20/mes | Necesario para cron; Free alcanza para MVP sin cron |
+| Supabase Free → Pro | $0–25/mes | Free OK para arrancar |
+| Anthropic Claude API | ~$10–50/mes | Pay-as-you-go según uso de Meni |
+| Transbank | variable | Comisión por transacción (Celso ya tiene cuenta) |
+| Dominio | $10–20/año | elmenu.cl |
+| **Total fijo** | **~$30–95/mes** | Sin contar Transbank |
 
 ---
 
-## 8. Próximos pasos sugeridos
-
-**Completado ✅**
-1. ~~Steps 1–6~~ — Supabase, catálogos, auth, checkout, detalle de pedido
-2. ~~Auditoría Vercel~~ — build limpio, error pages, SEO, .env.example, español chileno
-3. ~~Step 10~~ — Deploy en Vercel activo (GitHub → Vercel auto-deploy en push a master)
-4. ~~Mapa Leaflet~~ — rediseño completo con GeoJSON local, búsqueda, lista expandible
-
-**Completado ✅ — Step 8 + 9:**
-5. Home dinámica con Supabase + Sección 3 (carrusel productos) + Sección 6 (recetas IA) + cron + admin recetas + 6 recetas en DB
-
-**Siguiente después del Step 8+9:**
-6. **[OPERACIONAL - URGENTE]** Agregar `CRON_SECRET` en Vercel Dashboard → Environment Variables (sin esto el cron de recetas falla con 401)
-7. Credenciales Transbank producción + test end-to-end en dominio live
-8. Step 7 (Meni chat) — un solo agente para web + WhatsApp vía n8n
-9. OG image (`/public/og-image.png` 1200×630px)
-10. Analytics (Vercel Analytics — 1 línea)
-11. Emails transaccionales (Resend)
-12. Dominio personalizado (elmenu.cl)
-13. Página `/recetas/[id]` — detalle de receta con preparación paso a paso (actualmente las recetas no tienen campo `steps`, sería agregar a la tabla y al cron)
-
----
-
-## 9. Cómo probar el checkout end-to-end (dev local)
-
-1. Dev server corriendo: `npm run dev`
-2. Ir a `http://localhost:3000/catalogo`, agregar productos por **al menos $20.000**
-3. Carrito → **Pagar con tarjeta** → `/checkout`
-4. Completar form: nombre, teléfono, dirección, elegir comuna
-5. Click **Pagar … con Webpay** → pantalla de integración Transbank
-6. Tarjeta de prueba:
-   - **Número:** `4051 8856 0000 0044`
-   - **CVV:** `123` · **Vencimiento:** `11/27` · **Rut:** `11.111.111-1` · **Clave dinámica:** `123`
-7. Confirmación → `/checkout/confirmacion?status=success` → **Ver detalle** → `/pedido/[id]`
-
-Para cancelación: click "Anular compra" en Transbank → `status=cancelled`
-Para error: CVV `000` → `status=failed`
-
-Más tarjetas de prueba: https://www.transbankdevelopers.cl/documentacion/como_empezar#tarjetas-de-prueba
-
----
-
-*Documento actualizado tras: Step 8+9 completado (home dinámica, carrusel productos, recetas IA con 6 recetas en DB, admin recetas, cron Vercel, diseño profesional de RecipesSection). Commits `e774a00`, `<próximo>` — en producción en Vercel.*
+*Documento actualizado tras: Step 7 completado (Meni chat web con tool use, tarjetas clickeables, emoji lookup, búsqueda plural→singular), admin rediseñado (sidebar oscuro, KPI, kanban), notificaciones WhatsApp (CallMeBot), OG image (Canva IA). El proyecto está listo para producción pendiendo solo pasos operacionales de Celso.*
