@@ -51,10 +51,10 @@ const CSS = `
   .num { font-variant-numeric: tabular-nums; }
 
   /* TOP BAR */
-  .topbar { background: var(--green-900); color: #fff; font-size: 12px; font-weight: 500; letter-spacing: .02em; }
-  .topbar .inner { max-width: 1280px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  .topbar .zone { display: inline-flex; align-items: center; gap: 8px; color: var(--green-400); }
-  .topbar .links { display: flex; gap: 24px; color: rgba(255,255,255,.75); }
+  .topbar { background: var(--green-900); color: #fff; }
+  .topbar .inner { max-width: 1280px; margin: 0 auto; padding: 8px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .topbar .tagline { font-family: var(--font-dancing), cursive; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.01em; line-height: 1.3; }
+  .topbar .links { display: flex; gap: 24px; color: rgba(255,255,255,.75); font-size: 12px; font-weight: 500; letter-spacing: .02em; }
   .topbar .links a:hover { color: #fff; }
 
   /* NAV */
@@ -293,7 +293,7 @@ const CSS = `
   .menu-btn:hover { background: var(--green-50); color: var(--green-700); }
   .drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 100; opacity: 0; pointer-events: none; transition: opacity .25s ease; }
   .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
-  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 360px; max-width: 92vw; background: #fff; z-index: 101; transform: translateX(100%); transition: transform .3s cubic-bezier(.22,.61,.36,1); box-shadow: -12px 0 32px rgba(0,0,0,.12); display: flex; flex-direction: column; }
+  .drawer { position: fixed; top: 0; left: 0; bottom: 0; width: 360px; max-width: 92vw; background: #fff; z-index: 101; transform: translateX(-100%); transition: transform .3s cubic-bezier(.22,.61,.36,1); box-shadow: 12px 0 32px rgba(0,0,0,.12); display: flex; flex-direction: column; }
   .drawer.open { transform: translateX(0); }
   .drawer-head { padding: 22px 24px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--gray-200); }
   .drawer-head h3 { font-size: 22px; font-family: 'Fraunces', serif; color: var(--green-900); }
@@ -313,6 +313,7 @@ const CSS = `
   .drawer-foot a:hover { color: var(--green-900); }
 
   .zones-hint-mobile { display: none; }
+  .nav-hamburger-m { display: none; }
 
   /* ZONES SECTION */
   .zones-frame { border-radius: var(--radius-xl); overflow: hidden; box-shadow: 0 20px 56px rgba(27,43,30,.09), 0 4px 16px rgba(27,43,30,.05); height: 560px; position: relative; background: #F0F4F0; }
@@ -349,8 +350,11 @@ const CSS = `
     .zones-frame { height: 380px; border-radius: var(--radius-lg); }
     .zones-legend { gap: 12px; }
     .zl-sep { display: none; }
-    .nav .inner { gap: 12px; padding: 0 16px; }
+    .nav .inner { display: flex; align-items: center; gap: 8px; padding: 0 16px; }
     .search-box { display: none; }
+    .nav-hamburger-m { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; color: var(--green-900); flex-shrink: 0; }
+    .menu-btn { display: none; }
+    .logo { margin-left: auto; }
     .hero-door { padding: 32px 24px; min-height: 380px; }
     .trust-strip { grid-template-columns: 1fr; padding: 22px 24px; }
     .ai-section { padding: 40px 24px; }
@@ -410,7 +414,7 @@ const IcoX = ({ size = 18 }: { size?: number }) => <svg width={size} height={siz
 /* ── DATA ─────────────────────────────────────────── */
 const HOW_STEPS = [
   { cls: 'q', emoji: '🛒', num: '01', title: 'Elige tu pedido', desc: 'En la web o por WhatsApp. Con Meni, nuestro asistente IA, o armándolo tú mismo.' },
-  { cls: 's', emoji: '💳', num: '02', title: 'Paga en segundos', desc: 'Webpay, Khipu o transferencia. Confirmación instantánea, sin esperas ni sorpresas.' },
+  { cls: 's', emoji: '💳', num: '02', title: 'Paga en segundos', desc: 'Webpay Plus de Transbank. Confirmación instantánea, sin esperas ni sorpresas.' },
   { cls: 'l', emoji: '🚚', num: '03', title: 'Despachamos ese día', desc: 'Pedidos antes de las 16:00 salen ese mismo día a las 27 comunas que cubrimos.' },
   { cls: 'c', emoji: '🌿', num: '04', title: 'Recibes fresco', desc: 'Garantía de frescura. Si algo no llega en punto, lo cambiamos o te devolvemos el dinero.' },
 ]
@@ -599,7 +603,7 @@ export default function HomePage() {
       {/* TOP BAR */}
       <div className="topbar">
         <div className="inner">
-          <div className="zone"><IcoMap /> Despachamos a <strong style={{ color: '#fff', marginLeft: 4 }}>toda la RM</strong> · Pedido mínimo $20.000</div>
+          <span className="tagline">Tenemos esa Oferta que Sorprende🤩</span>
           <div className="links">
             <Link href="/mi-cuenta#pedidos">Seguir mi pedido</Link>
             <a href="https://wa.me/56954952395?text=Hola!%20Necesito%20ayuda" target="_blank" rel="noopener noreferrer">Ayuda</a>
@@ -611,6 +615,15 @@ export default function HomePage() {
       {/* NAV */}
       <nav className="nav">
         <div className="inner">
+          {/* Mobile hamburger — izquierda, oculto en desktop */}
+          <button
+            type="button"
+            className="nav-hamburger-m"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Abrir menú"
+          >
+            <IcoMenu />
+          </button>
           <Link href="/" className="logo" aria-label="El Menú — inicio">
             <img src="/logo/elmenu-color.png" alt="El Menú" />
           </Link>
