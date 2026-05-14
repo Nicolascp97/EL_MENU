@@ -1,6 +1,6 @@
 # El Menú — Estado del Proyecto
 
-> Última actualización: **2026-05-13** (post auditoría Vercel + mapa Leaflet + home rediseñada + español chileno)
+> Última actualización: **2026-05-14** (Step 8+9 completado: home dinámica + carrusel productos + recetas IA en DB + admin recetas + cron Vercel)
 > Stack: Next.js 16 (App Router, Turbopack) · TypeScript · Tailwind v4 · Supabase (PG + Auth + Storage + Realtime) · Anthropic Claude · Kie.ai (imágenes) · Transbank Webpay · Vercel
 
 ---
@@ -61,16 +61,19 @@ El proyecto está al **90% del camino a producción**. Toda la funcionalidad cor
 - **`UserMenu`** dropdown con perfil, rol (badge color-coded), links contextuales, **logout** vía Server Action `signOutAction`
 - **`/mi-cuenta`** con datos personales + lista de pedidos + botón cerrar sesión
 
-### 1.7 Home rediseñada ✅ (nuevo)
-- **Mapa interactivo Leaflet** con CartoDB Positron (tiles premium sin atribución comercial)
-  - 3 zonas con relleno por color: Oriente (verde `#16A34A`), Norte/Centro/Poniente (rojo `#DC2626`), Sur (ámbar `#D97706`)
-  - Tooltip rico al hover: nombre de zona, lista de comunas, badge con precio de despacho
-  - Marcador logo personalizado en Los Olmos 3967, Macul (con anillo verde)
-  - GeoJSON de Chile filtrado a Región Metropolitana (COD_REGI=13), sin SSR
-  - Leyenda con puntos de colores + "Despacho $2.990 · Mínimo $20.000"
-- **Sección "¿Cómo funciona?"** — 4 pasos animados (Elige → Paga → Despachamos → Recibes fresco) reemplazando la sección de productores
-- **Sección "Explora por categoría" eliminada** (era redundante con el catálogo)
-- Topbar, Navbar, Hero, B2B, testimonials, FAQ y footer mantienen su estructura
+### 1.7 Home rediseñada ✅
+- **Mapa interactivo Leaflet** con CartoDB Positron — sistema binario verde/gris
+  - Verde (`#22C55E`) = 27 comunas con despacho · Gris (`#94A3B8`) = sin cobertura
+  - GeoJSON local: `public/comunal-rm.geojson` (GADM, 52 comunas RM, ~92KB) — sin dependencia externa
+  - Barra de búsqueda con autocomplete glassmorphism + flyTo a la comuna buscada
+  - Popup al tocar/hover: nombre comuna, "✓ Hacemos despacho aquí", "$2.990 · Mínimo $20.000"
+  - Toggle "Ver las 27 comunas ▼" bajo el mapa → grilla expandible (4 col desktop, 2 col mobile)
+  - Sin tarjeta de tienda overlay (se eliminó para que el mapa se vea completo)
+  - `norm()` stripea espacios además de diacríticos — crítico porque GADM usa "ElBosque" sin espacios
+- **Sección "¿Cómo funciona?"** — 4 pasos animados
+- Topbar con Dancing Script, Navbar móvil con drawer izquierdo, sin carrito en home
+- **IMPORTANTE:** El home (`(catalog)/page.tsx`) es un Client Component gigante (~950 líneas) con `const CSS` string. TODO el CSS del home va dentro de ese string, no en globals.css ni Tailwind.
+- **Secciones 3 y 6 del JSX no existen aún** (el numerado salta 2→4 y 5→7) — se construirán en Step 9
 
 ### 1.8 Checkout con Transbank Webpay Plus ✅
 - `transbank-sdk@6.1.1` instalado
@@ -100,39 +103,43 @@ El proyecto está al **90% del camino a producción**. Toda la funcionalidad cor
 
 ## 2. Lo que falta para producción ⏳
 
-### 2.1 Step 10 — Deploy (bloqueante para salir a producción)
-**Estimado:** ~2 horas
-- [ ] Push a GitHub (`git push origin master`)
-- [ ] Conectar repo a Vercel (import project)
-- [ ] Cargar las **11 env vars** en Vercel Dashboard (ver tabla en sección 4)
-- [ ] Apuntar dominio personalizado (¿`elmenu.cl` u otro?)
-- [ ] Configurar Auth → Site URL en Supabase al dominio final
-- [ ] Apuntar webhook de Transbank al dominio prod (`https://{dominio}/api/transbank/return`)
-- [ ] Test end-to-end con tarjeta de integración Transbank en prod
+### 2.1 Step 10 — Deploy ✅ COMPLETADO
+- Repo en GitHub: `Nicolascp97/EL_MENU` · rama `master`
+- Vercel conectado y con deploy activo (commit `98b3e02` en producción)
+- Env vars cargadas en Vercel Dashboard
+- **Pendiente aún:** dominio personalizado, credenciales Transbank producción, test end-to-end en prod
 
-### 2.2 Step 7 — Chat widget Meni (diferenciador, no bloqueante)
+### 2.2 Step 8 + Step 9 — Recetas IA + Home dinámica ✅ COMPLETADO
+
+**Archivos creados/modificados:**
+- `src/app/(catalog)/page.tsx` ← Server wrapper async (pre-fetcha featured + recipes)
+- `src/app/(catalog)/_components/HomeClient.tsx` ← Client Component (era page.tsx)
+- `src/app/(catalog)/_components/RecipesSection.tsx` ← Client Component con useCart
+- `src/app/api/cron/generar-recetas/route.ts` ← cron Bearer auth, usa claude-sonnet-4-6
+- `src/app/api/admin/trigger-recipes/route.ts` ← proxy seguro admin
+- `src/app/admin/recetas/page.tsx` ← gestión editorial + toggle + regenerar
+- `vercel.json` ← cron lunes 6 AM `0 6 * * 1`
+
+**DB:** 6 recetas insertadas con product_ids reales:
+🥗 Ensalada Primavera con Palta · 🥦 Crema de Brócoli con Almendras · 🥤 Jugo Verde Detox · 🍲 Cazuela de Porotos · 🫘 Ensalada de Garbanzos · 🥭 Smoothie Tropical
+
+**Pendiente operacional:** Agregar `CRON_SECRET` en Vercel Dashboard → Environment Variables.
+
+### 2.3 Step 7 — Chat Meni (diferenciador, no bloqueante)
 **Estimado:** 2 días
-- [ ] `/api/chat/route.ts` — streaming con Anthropic SDK, system prompt de Meni, herramientas para consultar productos/zonas y crear pedidos
+
+**Arquitectura aprobada:** Un solo endpoint `/api/chat/route.ts` sirve a dos clientes:
+- **Web:** `ChatWidget.tsx` llama directamente al endpoint
+- **WhatsApp:** WhatsApp Business API → n8n → mismo `/api/chat` endpoint
+
+- [ ] `/api/chat/route.ts` — streaming con Anthropic SDK, system prompt de Meni, tools para consultar productos/zonas/crear pedidos
 - [ ] `src/hooks/useChat.ts` — estado de mensajes, isOpen, isLoading
 - [ ] `src/components/chat/ChatWidget.tsx` + `ChatModal.tsx`
-- [ ] Integrar en layout principal; cambiar botón home de WhatsApp → ChatModal
-- [ ] `/api/webhook/whatsapp/route.ts` — mismo sistema vía n8n con secret de auth
-- [ ] Persistir conversación en tabla `conversations` (ya existe en DB)
+- [ ] Integrar en layout; cambiar botón home WhatsApp → ChatModal
+- [ ] `/api/webhook/whatsapp/route.ts` — mismo sistema vía n8n
+- [ ] Persistir conversaciones en tabla `conversations` (ya existe en DB)
 
-### 2.3 Step 8 — Recetas IA cron (feature de retención)
-**Estimado:** 1 día
-- [ ] `/api/cron/generar-recetas/route.ts` con auth bearer `CRON_SECRET`
-- [ ] `vercel.json` con cron schedule lunes 6 AM
-- [ ] `RecipesSection.tsx` — cards reales con ingredientes + "Agregar al carrito"
-- [ ] `/admin/recetas/page.tsx` — regenerar manualmente + toggle activo
-
-### 2.4 Step 9 — Home dinámica con Supabase (mejora visual)
-**Estimado:** 0.5 día
-- [ ] Cambiar `src/app/(catalog)/page.tsx` a Server Component para fetchear `featured=true AND active=true`
-- [ ] Reemplazar arrays hardcoded `OFFERS`, `POPULAR`, `NEW` en `CarouselTabs` por queries reales
-- [ ] Mantener el CSS inline (aprobado visualmente) — solo cambiar fuente de datos
-
-### 2.5 Mejoras menores
+### 2.4 Mejoras menores
 - [ ] **Loading states** en `/catalogo` y `/mayorista` (Suspense + skeleton)
 - [ ] **Analytics** (Vercel Analytics o Google Analytics)
 - [ ] **Email de orden creada** (Resend o Supabase Edge Function) — notificar a Celso
@@ -303,24 +310,22 @@ El agente IA mantiene memoria persistente con decisiones de diseño:
 
 ## 8. Próximos pasos sugeridos
 
-**Prioridad 1 — Para vender (MVP en producción):**
-1. ~~Steps 1–6~~ — ✅ DONE (Supabase, catálogos, auth, checkout, detalle de pedido)
-2. ~~Auditoría Vercel~~ — ✅ DONE (build limpio, error pages, SEO, .env.example, español chileno)
-3. **Step 10**: push a GitHub + conectar Vercel + env vars + dominio (~2 horas)
-4. Configurar credenciales Transbank live + test end-to-end en prod
+**Completado ✅**
+1. ~~Steps 1–6~~ — Supabase, catálogos, auth, checkout, detalle de pedido
+2. ~~Auditoría Vercel~~ — build limpio, error pages, SEO, .env.example, español chileno
+3. ~~Step 10~~ — Deploy en Vercel activo (GitHub → Vercel auto-deploy en push a master)
+4. ~~Mapa Leaflet~~ — rediseño completo con GeoJSON local, búsqueda, lista expandible
 
-**Prioridad 2 — Diferenciación:**
-5. Step 7 (Meni chat web) — diferencial competitivo principal
-6. Step 9 (home dinámica) — reemplazar mocks por data real de Supabase
+**Completado ✅ — Step 8 + 9:**
+5. Home dinámica con Supabase + Sección 3 (carrusel productos) + Sección 6 (recetas IA) + cron + admin recetas + 6 recetas en DB
 
-**Prioridad 3 — Operación:**
-7. Step 8 (recetas IA cron)
-8. WhatsApp via n8n (parte de Step 7)
-9. Emails transaccionales (Resend)
-10. OG image (1200×630px para redes)
-11. Analytics (Vercel Analytics — 1 línea de código)
-
-**Tiempo estimado para MVP en producción: ~2–3 horas** (solo falta el deploy en Vercel).
+**Siguiente después del Step 8+9:**
+6. Credenciales Transbank producción + test end-to-end en dominio live
+7. Step 7 (Meni chat) — un solo agente para web + WhatsApp vía n8n
+8. OG image (`/public/og-image.png` 1200×630px)
+9. Analytics (Vercel Analytics — 1 línea)
+10. Emails transaccionales (Resend)
+11. Dominio personalizado (elmenu.cl)
 
 ---
 
