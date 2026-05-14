@@ -1,9 +1,7 @@
 'use client'
-import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useCart } from '@/hooks/useCart'
-import CartDrawer from '@/components/catalog/CartDrawer'
 import UserMenu from '@/components/auth/UserMenu'
 import { createClient } from '@/lib/supabase/client'
 import type { UserRole } from '@/types/database'
@@ -354,7 +352,8 @@ const CSS = `
     .search-box { display: none; }
     .nav-hamburger-m { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; color: var(--green-900); flex-shrink: 0; }
     .menu-btn { display: none; }
-    .logo { margin-left: auto; }
+    .nav-right { order: 2; margin-left: auto; }
+    .logo { order: 3; }
     .hero-door { padding: 32px 24px; min-height: 380px; }
     .trust-strip { grid-template-columns: 1fr; padding: 22px 24px; }
     .ai-section { padding: 40px 24px; }
@@ -522,18 +521,8 @@ function NewsletterForm() {
 /* ── MAIN PAGE ────────────────────────────────────── */
 export default function HomePage() {
   const router = useRouter()
-  const items = useCart(s => s.items)
-  const toggleCart = useCart(s => s.toggleCart)
   const [role, setRole] = useState<UserRole | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
-  // useCart persiste en localStorage (zustand/persist). En SSR no existe, así que
-  // sincronizamos con el evento de hidratación del store para evitar mismatch.
-  const cartHydrated = useSyncExternalStore(
-    cb => useCart.persist.onFinishHydration(cb),
-    () => useCart.persist.hasHydrated(),
-    () => false,
-  )
-  const cartCount = cartHydrated ? items.reduce((sum, i) => sum + i.qty, 0) : 0
 
   // Cargar rol del usuario para condicionar la banda B2B.
   useEffect(() => {
@@ -638,10 +627,6 @@ export default function HomePage() {
           </form>
           <div className="nav-right">
             <UserMenu className="nav-btn" />
-            <button type="button" className="nav-btn cart" onClick={toggleCart} aria-label="Abrir carrito">
-              <IcoCart /><span>Carrito</span>
-              {cartCount > 0 && <span className="badge num">{cartCount}</span>}
-            </button>
             <button
               type="button"
               className="menu-btn"
@@ -1071,8 +1056,6 @@ export default function HomePage() {
         </div>
       </aside>
 
-      {/* Drawer del carrito (controlado por useCart, lo dispara el botón "Carrito" del nav) */}
-      <CartDrawer />
     </>
   )
 }
