@@ -3,16 +3,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import 'leaflet/dist/leaflet.css'
 
-/* ── Available communes (NFD-normalized, no accents) ─────────────── */
+/* ── norm: lowercase + remove diacritics + remove spaces ────────────
+   GADM NAME_3 has no spaces ("ElBosque", "LasCondes"), so we strip
+   spaces from both sides when matching.                              */
+function norm(s: string): string {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '')
+}
+
+/* ── Available communes (norm keys, no spaces, no accents) ──────── */
 const AVAILABLE = new Set([
-  'providencia','nunoa','las condes','vitacura','lo barnechea','la reina',
+  'providencia','nunoa','lascondes','vitacura','lobarnechea','lareina',
   'santiago','recoleta','independencia','renca','quilicura','huechuraba',
-  'pudahuel','estacion central','cerrillos','maipu',
-  'macul','penalolen','la florida','puente alto','san joaquin','san miguel',
-  'la cisterna','el bosque','la granja','san ramon','pedro aguirre cerda',
+  'pudahuel','estacioncentral','cerrillos','maipu',
+  'macul','penalolen','laflorida','puentealto','sanjoaquin','sanmiguel',
+  'lacisterna','elbosque','lagranja','sanramon','pedroaguirrecerda',
 ])
 
-/* Display names for autocomplete (sorted A→Z) */
+/* Display names for autocomplete — sorted A→Z */
 const COMMUNE_LIST = [
   'Cerrillos','El Bosque','Estación Central','Huechuraba','Independencia',
   'La Cisterna','La Florida','La Granja','La Reina','Las Condes',
@@ -22,21 +29,16 @@ const COMMUNE_LIST = [
   'Santiago','Vitacura',
 ].sort()
 
-function norm(s: string): string {
-  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
-}
-
-/* ── Layer styles (defined once, never re-created) ───────────────── */
+/* ── Layer styles ────────────────────────────────────────────────── */
 const S_AVAIL   = { fillColor:'#22C55E', fillOpacity:0.38, color:'#16A34A', weight:1.5, opacity:0.70 }
 const S_UNAVAIL = { fillColor:'#94A3B8', fillOpacity:0.15, color:'#CBD5E1', weight:0.6, opacity:0.45 }
 const S_HOVER   = { fillOpacity:0.55, weight:2.0 }
 const S_HI      = { fillColor:'#16A34A', fillOpacity:0.62, color:'#15803D', weight:2.5, opacity:0.95 }
 
-const BIZ: [number, number]  = [-33.490, -70.598]
-const CENTER: [number, number] = [-33.47, -70.64]
+const BIZ: [number, number]    = [-33.490, -70.598]
+const CENTER: [number, number] = [-33.47,  -70.64]
 const ZOOM = 10
 
-/* ── Inline-style helpers ────────────────────────────────────────── */
 const glass: React.CSSProperties = {
   background: 'rgba(255,255,255,0.93)',
   backdropFilter: 'blur(18px)',
@@ -51,24 +53,21 @@ export default function ZonesMap() {
   const hiRef        = useRef<string | null>(null)
   const timerRef     = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const [search, setSearch]   = useState('')
-  const [open, setOpen]       = useState(false)
-  const [status, setStatus]   = useState<'idle'|'found'|'notfound'>('idle')
+  const [search, setSearch] = useState('')
+  const [open, setOpen]     = useState(false)
+  const [status, setStatus] = useState<'idle'|'found'|'notfound'>('idle')
 
-  /* Autocomplete list — derived, not state */
   const suggestions = useMemo(() => {
     const q = norm(search)
     if (!q) return []
     return COMMUNE_LIST.filter(n => norm(n).includes(q)).slice(0, 6)
   }, [search])
 
-  /* Fly to a commune, highlight it, open popup */
   const flyTo = useCallback((name: string) => {
     const key   = norm(name)
     const layer = layersRef.current[key]
     if (!layer || !mapRef.current) return
 
-    // Reset previous highlight
     if (hiRef.current && hiRef.current !== key) {
       const prev = layersRef.current[hiRef.current]
       if (prev) prev.setStyle({ ...S_AVAIL })
@@ -91,7 +90,6 @@ export default function ZonesMap() {
     }, 3500)
   }, [])
 
-  /* Enter key / submit search */
   const handleSearch = useCallback(() => {
     const q = norm(search)
     if (!q) return
@@ -107,7 +105,6 @@ export default function ZonesMap() {
     }
   }, [search, flyTo])
 
-  /* Boot Leaflet once */
   useEffect(() => {
     const container = mapContainer.current
     if (!container || mapRef.current) return
@@ -126,7 +123,6 @@ export default function ZonesMap() {
       })
       mapRef.current = map
 
-      /* CartoDB Positron — reduced opacity for less visual noise */
       L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
         attribution:
           '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> ' +
@@ -136,53 +132,51 @@ export default function ZonesMap() {
         opacity: 0.72,
       }).addTo(map)
 
-      /* GeoJSON layer */
       try {
-        const res = await fetch(
-          'https://raw.githubusercontent.com/fcortes/Chile-GeoJSON/master/Comunal.geojson'
-        )
+        /* Local file — no external dependency, no 404 risk */
+        const res = await fetch('/comunal-rm.geojson')
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data: any = await res.json()
 
         L.geoJSON(data, {
-          filter:  (f) => Number(f?.properties?.COD_REGI) === 13,
-          style:   (f) => {
-            const k = norm(f?.properties?.NOM_COM ?? '')
+          style: (f) => {
+            const k = norm(f?.properties?.NAME_3 ?? '')
             return AVAILABLE.has(k) ? { ...S_AVAIL } : { ...S_UNAVAIL }
           },
           onEachFeature: (f, layer) => {
-            const raw: string = f?.properties?.NOM_COM ?? ''
+            const raw: string = f?.properties?.NAME_3 ?? ''
             const key = norm(raw)
             const avail = AVAILABLE.has(key)
 
             layersRef.current[key] = layer
-            if (!avail) return
 
-            /* Minimal popup */
-            layer.bindPopup(
-              `<div style="font-family:Inter,system-ui,sans-serif;min-width:150px;padding:2px 0">` +
-              `<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">` +
-              `<span style="width:7px;height:7px;border-radius:50%;background:#22C55E;flex-shrink:0"></span>` +
-              `<strong style="font-size:13px;color:#1B2B1E">${raw}</strong>` +
-              `</div>` +
-              `<p style="font-size:11px;color:#15803D;font-weight:700;margin:0 0 3px">✓ Hacemos despacho aquí</p>` +
-              `<p style="font-size:11px;color:#6B7A6F;margin:0">$2.990 · Mínimo $20.000</p>` +
-              `</div>`,
-              { closeButton: false, className: 'zm-popup', maxWidth: 210 }
-            )
+            /* Use proper display name from COMMUNE_LIST if possible */
+            const displayName = COMMUNE_LIST.find(n => norm(n) === key) ?? raw
 
-            layer.on('click',     () => layer.openPopup())
-            layer.on('mouseover', () => (layer as any).setStyle({ ...S_AVAIL, ...S_HOVER }))
-            layer.on('mouseout',  () => {
-              if (hiRef.current !== key) (layer as any).setStyle({ ...S_AVAIL })
-            })
+            if (avail) {
+              layer.bindPopup(
+                `<div style="font-family:Inter,system-ui,sans-serif;min-width:150px;padding:2px 0">` +
+                `<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px">` +
+                `<span style="width:7px;height:7px;border-radius:50%;background:#22C55E;flex-shrink:0"></span>` +
+                `<strong style="font-size:13px;color:#1B2B1E">${displayName}</strong>` +
+                `</div>` +
+                `<p style="font-size:11px;color:#15803D;font-weight:700;margin:0 0 3px">✓ Hacemos despacho aquí</p>` +
+                `<p style="font-size:11px;color:#6B7A6F;margin:0">$2.990 · Mínimo $20.000</p>` +
+                `</div>`,
+                { closeButton: false, className: 'zm-popup', maxWidth: 210 }
+              )
+              layer.on('click',     () => layer.openPopup())
+              layer.on('mouseover', () => (layer as any).setStyle({ ...S_AVAIL, ...S_HOVER }))
+              layer.on('mouseout',  () => {
+                if (hiRef.current !== key) (layer as any).setStyle({ ...S_AVAIL })
+              })
+            }
           },
         }).addTo(map)
       } catch (err) {
         console.error('[ZonesMap]', err)
       }
 
-      /* El Menú — small dot marker */
       const dot = L.divIcon({
         html: `<div style="width:10px;height:10px;border-radius:50%;background:#1B2B1E;` +
               `box-shadow:0 0 0 3px rgba(27,43,30,.18),0 0 0 7px rgba(27,43,30,.07)"></div>`,
@@ -207,15 +201,13 @@ export default function ZonesMap() {
     }
   }, [])
 
-  /* ─────────────────── JSX ─────────────────── */
   return (
     <div style={{ position:'relative', width:'100%', height:'100%' }}>
 
-      {/* ── Search bar ── */}
+      {/* Search bar */}
       <div style={{ position:'absolute', top:12, left:12, right:12, zIndex:1000, pointerEvents:'auto' }}>
         <div style={{ ...glass, borderRadius:14, overflow:'hidden' }}>
 
-          {/* Input */}
           <div style={{ display:'flex', alignItems:'center', paddingLeft:13, paddingRight:6 }}>
             <svg width="15" height="15" fill="none" stroke="#9CA3AF" strokeWidth="2"
               strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" style={{ flexShrink:0 }}>
@@ -250,7 +242,6 @@ export default function ZonesMap() {
             )}
           </div>
 
-          {/* Autocomplete */}
           {open && suggestions.length > 0 && (
             <div style={{ borderTop:'1px solid rgba(0,0,0,0.05)' }}>
               {suggestions.map(name => (
@@ -275,7 +266,6 @@ export default function ZonesMap() {
             </div>
           )}
 
-          {/* Status */}
           {status !== 'idle' && (
             <div style={{
               display:'flex', alignItems:'center', gap:7,
@@ -294,10 +284,10 @@ export default function ZonesMap() {
         </div>
       </div>
 
-      {/* ── Leaflet map container ── */}
+      {/* Leaflet map */}
       <div ref={mapContainer} style={{ width:'100%', height:'100%' }} />
 
-      {/* ── Store card ── */}
+      {/* Store card */}
       <div style={{
         position:'absolute', bottom:20, left:12, zIndex:1000, pointerEvents:'auto',
         ...glass,
