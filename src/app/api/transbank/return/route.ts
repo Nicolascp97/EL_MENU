@@ -9,10 +9,42 @@ import { createWebpayPlus } from '@/lib/transbank'
  * 1. Pago completado → form POST con `token_ws`.
  * 2. Pago cancelado por el usuario → form POST con `TBK_TOKEN`.
  * 3. Timeout o error → puede llegar GET con TBK_TOKEN/TBK_ORDEN_COMPRA.
- *
- * Hacemos `tx.commit(token_ws)` para finalizar la transacción y actualizamos
- * el pedido. Después redirigimos a /checkout/confirmacion?status=...&orderId=...
  */
+
+type OrderRow = {
+  id: string
+  total: number
+  phone: string
+  commune: string
+  address: string
+  items: { product_name: string; qty: number; unit: string }[]
+}
+
+async function notifyWhatsApp(order: OrderRow) {
+  const apiKey = process.env.CALLMEBOT_API_KEY
+  const phone = process.env.NEXT_PUBLIC_WA_NUMBER
+  if (!apiKey || !phone) return
+
+  const itemLines = (order.items ?? [])
+    .slice(0, 4)
+    .map(i => `• ${i.product_name} x${i.qty} ${i.unit}`)
+    .join('\n')
+  const extra = order.items.length > 4 ? `\n+${order.items.length - 4} productos más` : ''
+
+  const msg = [
+    `🥦 NUEVO PEDIDO El Menú`,
+    `#${order.id.slice(0, 8).toUpperCase()}`,
+    `💰 $${order.total.toLocaleString('es-CL')}`,
+    `📱 ${order.phone}`,
+    `📍 ${order.commune} — ${order.address}`,
+    ``,
+    itemLines + extra,
+  ].join('\n')
+
+  const url = `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodeURIComponent(msg)}&apikey=${apiKey}`
+  await fetch(url).catch(() => {})
+}
+
 async function handleReturn(req: Request): Promise<Response> {
   const url = new URL(req.url)
   const appUrl =
@@ -64,8 +96,13 @@ async function handleReturn(req: Request): Promise<Response> {
         status: authorized ? 'nuevo' : 'cancelado',
       })
       .eq('transbank_token', tokenWs)
-      .select('id')
+      .select('id, total, phone, commune, address, items')
       .maybeSingle()
+
+    // Notificar al local por WhatsApp cuando el pago es exitoso
+    if (authorized && order) {
+      notifyWhatsApp(order as OrderRow).catch(() => {})
+    }
 
     return NextResponse.redirect(
       `${appUrl}/checkout/confirmacion?status=${authorized ? 'success' : 'failed'}${
@@ -74,7 +111,6 @@ async function handleReturn(req: Request): Promise<Response> {
       { status: 303 }
     )
   } catch {
-    // Si commit falla, marcamos el order como fallido si lo encontramos.
     await admin
       .from('orders')
       .update({ payment_status: 'fallido', status: 'cancelado' })
