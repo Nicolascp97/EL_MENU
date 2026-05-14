@@ -464,7 +464,7 @@ const FAQS = [
   { q: '¿Cuánto tarda mi pedido en llegar?', a: 'Los pedidos confirmados antes de las 16:00 llegan ese mismo día. Después de las 16:00 entregamos al día siguiente. También puedes programar la fecha que prefieras al hacer checkout.' },
   { q: '¿Cómo accedo a precios mayoristas?', a: 'Si tienes restaurante, almacén, verdulería u otro negocio, regístrate en <a href="/mayorista/registro">/mayorista/registro</a> con tu RUT comercial. Validamos y activamos tu cuenta en menos de 24 horas hábiles.' },
   { q: '¿Qué pasa si un producto no llega fresco?', a: 'Tenemos garantía de frescura: si algo no cumple, lo cambiamos o devolvemos el dinero. Escríbenos por <a href="https://wa.me/56954952395">WhatsApp</a> con foto y lo resolvemos de inmediato.' },
-  { q: '¿Qué medios de pago aceptan?', a: 'Webpay (crédito y débito), Khipu y transferencia. Para clientes mayoristas también ofrecemos crédito a 30 días una vez validada la cuenta.' },
+  { q: '¿Qué medios de pago aceptan?', a: 'Aceptamos Webpay Plus de Transbank (débito, crédito y prepago). Es el único medio de pago disponible por ahora.' },
 ]
 
 function FadeUp({ children, className = '', style = {} }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
@@ -676,10 +676,10 @@ export default function HomePage() {
                 <span className="door-eye"><IcoHouse size={14} /> Para mi casa</span>
                 <div className="door-emoji">🥑</div>
                 <h2>Frescos <em>directo</em> a tu puerta.</h2>
-                <p className="door-desc">Frutas y verduras seleccionadas cada mañana en Lo Valledor, despachadas a toda la Región Metropolitana.</p>
+                <p className="door-desc">Frutas y verduras seleccionadas cada mañana en Lo Valledor, despachadas a 27 comunas seleccionadas de Santiago.</p>
                 <div className="door-meta">
                   <span><span className="chk"><IcoCheck /></span> Pedido mínimo $20.000</span>
-                  <span><span className="chk"><IcoCheck /></span> Despacho $2.500 en toda la RM</span>
+                  <span><span className="chk"><IcoCheck /></span> Despacho $2.990 en 27 comunas</span>
                   <span><span className="chk"><IcoCheck /></span> Pide hasta las 16:00, recibe hoy</span>
                 </div>
               </div>
@@ -692,11 +692,11 @@ export default function HomePage() {
                 <span className="door-eye"><IcoStore size={14} /> Para mi negocio</span>
                 <div className="door-emoji">🏪</div>
                 <h2>Precios <em>mayoristas</em> con servicio de oficina.</h2>
-                <p className="door-desc">Restaurantes, almacenes y verdulerías: compra por caja o bulto con facturación inmediata y crédito a 30 días.</p>
+                <p className="door-desc">Restaurantes, almacenes y verdulerías: compra por caja o bulto con facturación electrónica inmediata.</p>
                 <div className="door-meta">
                   <span><span className="chk"><IcoCheck /></span> Precios por caja y volumen</span>
                   <span><span className="chk"><IcoCheck /></span> Factura electrónica al instante</span>
-                  <span><span className="chk"><IcoCheck /></span> Crédito a 30 días para clientes validados</span>
+                  <span><span className="chk"><IcoCheck /></span> Entrega antes de las 7:00 AM</span>
                 </div>
               </div>
               <span className="door-cta">Ver catálogo mayorista <IcoArrow size={16} /></span>
@@ -719,7 +719,7 @@ export default function HomePage() {
               { icon: <IcoTruck />, title: 'Despacho mismo día', desc: 'Pedidos antes de las 16:00 llegan hoy en toda la RM.' },
               { icon: <IcoLeaf />, title: 'Cosechado <48h', desc: 'Compramos cada mañana en Lo Valledor. Si no es fresco, no lo vendemos.' },
               { icon: <IcoShield />, title: 'Garantía de frescura', desc: 'Si algún producto no cumple, lo cambiamos o devolvemos la plata.' },
-              { icon: <IcoCard />, title: 'Pago seguro', desc: 'Webpay, Khipu y transferencia. Crédito a 30 días para mayoristas.' },
+              { icon: <IcoCard />, title: 'Pago seguro', desc: 'Webpay Plus de Transbank. Débito, crédito y prepago.' },
             ].map(v => (
               <div key={v.title} className="trust-item">
                 <div className="ico-wrap">{v.icon}</div>
