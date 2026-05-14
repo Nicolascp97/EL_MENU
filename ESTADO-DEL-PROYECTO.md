@@ -1,13 +1,13 @@
 # El Menú — Estado del Proyecto
 
-> Última actualización: **2026-05-14** (Step 7 completado: Meni chat IA web + admin rediseñado + notificaciones WhatsApp + OG image)
-> Stack: Next.js 16 (App Router, Turbopack) · TypeScript · Tailwind v4 · Supabase (PG + Auth + Storage + Realtime) · Anthropic Claude Sonnet 4.6 · Kie.ai (imágenes) · Transbank Webpay · Vercel
+> Última actualización: **2026-05-14** (Sesión completa: Meni IA, admin, step cards 3D, footer, polish final)
+> Stack: Next.js 16 (App Router, Turbopack) · TypeScript · Tailwind v4 · Supabase (PG + Auth + Storage + Realtime) · Anthropic Claude Sonnet 4.6 · Kie.ai · Remotion · Transbank Webpay · Vercel
 
 ---
 
 ## Resumen ejecutivo
 
-El proyecto está al **97% del camino a producción**. Toda la funcionalidad core + diferenciadores están terminados. El build compila limpio (0 errores TypeScript). Lo único que falta para salir live son **3 pasos operacionales** que dependen de Celso: credenciales Transbank producción, activar CallMeBot, y apuntar el dominio.
+El proyecto está al **99% del camino a producción**. Todo el código está terminado y en producción en Vercel. Lo único que falta son **3 pasos operacionales que dependen exclusivamente de Celso**: credenciales Transbank producción, activar CallMeBot, y apuntar el dominio `elmenu.cl`.
 
 ---
 
@@ -107,7 +107,18 @@ El proyecto está al **97% del camino a producción**. Toda la funcionalidad cor
 - Búsqueda en singular con tilde: "limón" no "limones"
 - Manejo de selección por tarjeta: no re-agrega al carrito si viene `[seleccionó:]`
 
-### 1.13 Deploy ✅
+### 1.13 Step cards de ¿Cómo funciona? ✅
+- 4 imágenes PNG (`public/steps/step1-4.png`) — 1080×1350px, fondo verde oscuro `#1B2B1E`
+- Generadas con **Kie.ai · nano-banana-2**: número 3D metálico dorado sobre fondo verde, sin texto
+- Compuestas con **Remotion** (`SUSI-cowork/src/ElMenuSteps.tsx`): imagen Kie.ai + dot pattern SVG + gradiente + emoji + título Fraunces + descripción + sparkle
+- Pipeline: `python scripts/generate_kie.py` → `npx remotion still src/Root.tsx ElMenu-Step[N]` → `copy out\ElMenu-Step[N].png elmenu-app\public\steps\step[N].png`
+- En el home: `<article className="producer producer-img"><img src="/steps/step{i+1}.png" /></article>` — sin CSS de gradientes, sin emojis sobreimpuestos
+
+### 1.14 Footer limpiado ✅
+- Eliminado el bloque "Pagamos con: Webpay · Khipu · Flow · Mercado Pago" del footer
+- Queda solo: `© 2026 El Menú SpA · Todos los derechos reservados`
+
+### 1.15 Deploy ✅
 - Repo en GitHub: `Nicolascp97/EL_MENU` · rama `master`
 - Vercel conectado con auto-deploy en push a master
 - Env vars cargadas en Vercel Dashboard
@@ -247,6 +258,11 @@ elmenu-app/
 ├── public/
 │   ├── og-image.png                 ← 1280×720px Canva IA
 │   ├── comunal-rm.geojson           ← 52 comunas RM para Leaflet
+│   ├── steps/                       ← 4 step cards PNG (Kie.ai + Remotion)
+│   │   ├── step1.png
+│   │   ├── step2.png
+│   │   ├── step3.png
+│   │   └── step4.png
 │   └── logo/
 └── scripts/
     ├── generate-product-images.mjs
