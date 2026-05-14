@@ -3,15 +3,45 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Recipe } from '@/types/database'
 
+function daysAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const days = Math.floor(diff / 86400000)
+  if (days === 0) return 'hoy'
+  if (days === 1) return 'hace 1 día'
+  return `hace ${days} días`
+}
+
 function fmt(d: string) {
   return new Date(d).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () => void }) {
+  return (
+    <button
+      onClick={onChange}
+      role="switch"
+      aria-checked={checked}
+      style={{
+        width: 42, height: 24, borderRadius: 12, border: 0, cursor: 'pointer',
+        background: checked ? '#22C55E' : '#D1D5DB',
+        position: 'relative', transition: 'background .2s', flexShrink: 0, padding: 0,
+      }}
+    >
+      <span style={{
+        display: 'block', width: 18, height: 18, borderRadius: '50%',
+        background: '#fff', position: 'absolute', top: 3,
+        left: checked ? 21 : 3, transition: 'left .2s',
+        boxShadow: '0 1px 3px rgba(0,0,0,.25)',
+      }} />
+    </button>
+  )
 }
 
 export default function AdminRecetasPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [loading, setLoading] = useState(true)
   const [regenerating, setRegenerating] = useState(false)
-  const [msg, setMsg] = useState('')
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null)
 
   const sb = createClient()
 
@@ -31,101 +61,158 @@ export default function AdminRecetasPage() {
 
   async function regenerar() {
     setRegenerating(true)
-    setMsg('')
+    setMsg(null)
     try {
       const res = await fetch('/api/admin/trigger-recipes', { method: 'POST' })
       const json = await res.json()
       if (res.ok) {
-        setMsg(`✅ Generadas ${json.generated} recetas`)
+        setMsg({ text: `${json.generated} recetas generadas correctamente`, ok: true })
         await load()
       } else {
-        setMsg(`❌ Error: ${json.error}`)
+        setMsg({ text: json.error ?? 'Error al generar recetas', ok: false })
       }
-    } catch (e) {
-      setMsg(`❌ Error de red`)
+    } catch {
+      setMsg({ text: 'Error de red', ok: false })
     } finally {
       setRegenerating(false)
     }
   }
 
+  const activeCount = recipes.filter(r => r.active).length
+  const inactiveCount = recipes.filter(r => !r.active).length
+  const lastGenerated = recipes[0]?.generated_at
+
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 24px', fontFamily: 'Inter, system-ui, sans-serif' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28, gap: 16, flexWrap: 'wrap' }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto', padding: '32px 24px' }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, gap: 16, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 28, fontWeight: 700, margin: 0, color: '#1B2B1E' }}>Recetas IA</h1>
-          <p style={{ margin: '4px 0 0', color: '#6B7A6F', fontSize: 14 }}>Gestión de recetas generadas automáticamente</p>
+          <h1 style={{ fontFamily: "'Fraunces', Georgia, serif", fontSize: 26, fontWeight: 700, margin: '0 0 6px', color: '#1B2B1E' }}>
+            Recetas IA
+          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {lastGenerated && (
+              <span style={{
+                background: '#F0FFF4', color: '#2D6A4F', border: '1px solid #D8F3DC',
+                fontSize: 12, fontWeight: 500, padding: '3px 10px', borderRadius: 100,
+              }}>
+                Última generación: {daysAgo(lastGenerated)}
+              </span>
+            )}
+            {recipes.length > 0 && (
+              <span style={{ color: '#6B7A6F', fontSize: 13 }}>
+                {activeCount} activa{activeCount !== 1 ? 's' : ''} · {inactiveCount} inactiva{inactiveCount !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-          {msg && <span style={{ fontSize: 13, color: msg.startsWith('✅') ? '#2D6A4F' : '#C44536' }}>{msg}</span>}
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
           <button
             onClick={regenerar}
             disabled={regenerating}
             style={{
-              height: 44, padding: '0 20px', borderRadius: 100, background: '#1F4B35', color: '#fff',
-              fontWeight: 600, fontSize: 14, border: 0, cursor: regenerating ? 'default' : 'pointer',
-              opacity: regenerating ? .6 : 1, display: 'inline-flex', alignItems: 'center', gap: 8,
+              height: 44, padding: '0 22px', borderRadius: 100,
+              background: regenerating ? '#6B9B7A' : '#1F4B35', color: '#fff',
+              fontWeight: 700, fontSize: 14, border: 0,
+              cursor: regenerating ? 'default' : 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              boxShadow: regenerating ? 'none' : '0 2px 8px rgba(31,75,53,.3)',
+              transition: 'background .2s, box-shadow .2s',
             }}
           >
-            {regenerating ? '⏳ Generando...' : '🤖 Regenerar ahora'}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" />
+            </svg>
+            {regenerating ? 'Generando con IA...' : 'Regenerar con IA'}
           </button>
+          {msg && (
+            <span style={{ fontSize: 13, color: msg.ok ? '#2D6A4F' : '#C44536', fontWeight: 500 }}>
+              {msg.ok ? '✓' : '✗'} {msg.text}
+            </span>
+          )}
         </div>
       </div>
 
+      {/* Content */}
       {loading ? (
-        <p style={{ color: '#6B7A6F' }}>Cargando...</p>
+        <div style={{ padding: '48px 0', textAlign: 'center', color: '#6B7A6F' }}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#9DC4AA" strokeWidth="2" style={{ margin: '0 auto 10px', display: 'block', animation: 'spin 1s linear infinite' }}>
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          </svg>
+          Cargando recetas...
+        </div>
       ) : recipes.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 0', color: '#6B7A6F' }}>
-          <p>No hay recetas aún.</p>
-          <p style={{ fontSize: 13 }}>Haz clic en "Regenerar ahora" para generar las primeras.</p>
+        <div style={{ textAlign: 'center', padding: '64px 0', color: '#9DC4AA' }}>
+          <p style={{ fontWeight: 600, color: '#3A4A3E', margin: '0 0 6px', fontSize: 16 }}>Sin recetas aún</p>
+          <p style={{ fontSize: 13, margin: 0 }}>Haz clic en "Regenerar con IA" para generar el primer batch.</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="recipes-admin-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
           {recipes.map(r => (
             <div key={r.id} style={{
-              background: '#fff', border: `1px solid ${r.active ? '#D8F3DC' : '#E4E9E5'}`,
-              borderRadius: 14, padding: '18px 20px', display: 'flex', gap: 16, alignItems: 'flex-start',
-              opacity: r.active ? 1 : .55,
+              background: '#fff', borderRadius: 14, padding: '18px 20px',
+              border: `1px solid ${r.active ? '#D8F3DC' : '#E8EDE9'}`,
+              display: 'flex', gap: 14, alignItems: 'flex-start',
+              opacity: r.active ? 1 : .6, transition: 'opacity .2s',
             }}>
-              <span style={{ fontSize: 36, lineHeight: 1, flexShrink: 0 }}>{r.emoji}</span>
+              {/* Emoji */}
+              <span style={{ fontSize: 38, lineHeight: 1, flexShrink: 0 }}>{r.emoji}</span>
+
+              {/* Content */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-                  <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 17, color: '#1B2B1E' }}>{r.title}</span>
-                  <span style={{ background: '#EFF8F1', color: '#2D6A4F', fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 100 }}>{r.tag}</span>
-                  {r.active
-                    ? <span style={{ background: '#D8F3DC', color: '#1F4B35', fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 100 }}>● Activa</span>
-                    : <span style={{ background: '#EEF1ED', color: '#6B7A6F', fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 100 }}>Inactiva</span>
-                  }
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+                  <span style={{ fontFamily: "'Fraunces', serif", fontWeight: 700, fontSize: 16, color: '#1B2B1E' }}>
+                    {r.title}
+                  </span>
+                  <span style={{ background: '#F0FFF4', color: '#2D6A4F', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '.4px' }}>
+                    {r.tag}
+                  </span>
                 </div>
-                <p style={{ margin: 0, fontSize: 13, color: '#6B7A6F', lineHeight: 1.45 }}>{r.description}</p>
-                <div style={{ marginTop: 6, fontSize: 12, color: '#94A3B8', display: 'flex', gap: 12 }}>
-                  <span>⏱ {r.time_minutes} min</span>
-                  <span>👤 {r.servings} porciones</span>
+                <p style={{ margin: '0 0 6px', fontSize: 12, color: '#6B7A6F', lineHeight: 1.5 }}>{r.description}</p>
+                <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#9DC4AA', marginBottom: 8, flexWrap: 'wrap' }}>
+                  <span>{r.time_minutes} min</span>
+                  <span>{r.servings} porciones</span>
                   <span>{r.difficulty}</span>
                   <span>{fmt(r.generated_at)}</span>
                 </div>
-                <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  {r.ingredients.map(ing => (
-                    <span key={ing.name} style={{ background: '#F8F9FA', border: '1px solid #E4E9E5', borderRadius: 100, padding: '3px 8px', fontSize: 11, color: '#3A4A3E' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {r.ingredients.slice(0, 6).map(ing => (
+                    <span key={ing.name} style={{
+                      background: '#F8F9FA', border: '1px solid #E4E9E5',
+                      borderRadius: 100, padding: '2px 8px', fontSize: 10, color: '#3A4A3E',
+                    }}>
                       {ing.qty} {ing.unit} {ing.name}
                     </span>
                   ))}
+                  {r.ingredients.length > 6 && (
+                    <span style={{ fontSize: 10, color: '#9DC4AA', padding: '2px 4px' }}>
+                      +{r.ingredients.length - 6} más
+                    </span>
+                  )}
                 </div>
               </div>
-              <button
-                onClick={() => toggleActive(r.id, r.active)}
-                style={{
-                  flexShrink: 0, height: 36, padding: '0 14px', borderRadius: 8,
-                  background: r.active ? '#FDE6CC' : '#D8F3DC',
-                  color: r.active ? '#D96B12' : '#1F4B35',
-                  border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 13,
-                }}
-              >
-                {r.active ? 'Desactivar' : 'Activar'}
-              </button>
+
+              {/* Toggle */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                <ToggleSwitch checked={r.active} onChange={() => toggleActive(r.id, r.active)} />
+                <span style={{ fontSize: 10, color: r.active ? '#22C55E' : '#9DC4AA', fontWeight: 600 }}>
+                  {r.active ? 'Activa' : 'Inactiva'}
+                </span>
+              </div>
             </div>
           ))}
         </div>
       )}
+
+      <style>{`
+        @media (min-width: 640px) {
+          .recipes-admin-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   )
 }
