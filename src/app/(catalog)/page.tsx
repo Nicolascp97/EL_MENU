@@ -9,6 +9,15 @@ import dynamic from 'next/dynamic'
 
 const ZonesMap = dynamic(() => import('@/components/ZonesMap'), { ssr: false })
 
+const COMMUNES_WITH_DELIVERY = [
+  'Cerrillos','El Bosque','Estación Central','Huechuraba','Independencia',
+  'La Cisterna','La Florida','La Granja','La Reina','Las Condes',
+  'Lo Barnechea','Macul','Maipú','Ñuñoa','Pedro Aguirre Cerda',
+  'Peñalolén','Providencia','Pudahuel','Puente Alto','Quilicura',
+  'Recoleta','Renca','San Joaquín','San Miguel','San Ramón',
+  'Santiago','Vitacura',
+].sort()
+
 const CSS = `
   :root {
     --green-900:#1B2B1E; --green-800:#1F4B35; --green-700:#2D6A4F;
@@ -325,12 +334,17 @@ const CSS = `
   .zl-sep { flex: 1; }
   .zl-price { font-size: 13px; color: var(--gray-500); }
   .zl-price strong { color: var(--green-700); font-weight: 700; }
+  .zones-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--green-700); background: rgba(34,197,94,.08); border: 1px solid rgba(34,197,94,.18); padding: 5px 14px; border-radius: 20px; cursor: pointer; transition: background .15s; }
+  .zones-toggle:hover { background: rgba(34,197,94,.15); }
+  .zones-commune-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px 16px; margin-top: 14px; padding: 16px 20px; background: rgba(34,197,94,.04); border-radius: 14px; border: 1px solid rgba(34,197,94,.12); }
+  .zc-item { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--gray-700); font-weight: 500; }
 
   /* RESPONSIVE */
   @media (max-width: 1024px) {
     .hero-dual { grid-template-columns: 1fr; }
     .trust-strip { grid-template-columns: 1fr 1fr; }
     .zones-frame { height: 460px; }
+    .zones-commune-grid { grid-template-columns: repeat(3, 1fr); }
     .ai-grid { grid-template-columns: 1fr; }
     .b2b { grid-template-columns: 1fr; }
     .producers { grid-template-columns: 1fr 1fr; }
@@ -344,6 +358,7 @@ const CSS = `
     .container { padding: 0 16px; }
     .zones-frame { height: 390px; border-radius: var(--radius-lg); }
     .zones-legend { gap: 12px; }
+    .zones-commune-grid { grid-template-columns: repeat(2, 1fr); padding: 14px 16px; }
     .zl-sep { display: none; }
     .nav .inner { display: flex; align-items: center; gap: 8px; padding: 0 16px; }
     .search-box { display: none; }
@@ -490,6 +505,7 @@ export default function HomePage() {
   const router = useRouter()
   const [role, setRole] = useState<UserRole | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [zonesOpen, setZonesOpen] = useState(false)
 
   // Cargar rol del usuario para condicionar la banda B2B.
   useEffect(() => {
@@ -722,10 +738,23 @@ export default function HomePage() {
               Sin cobertura aún
             </div>
             <div className="zl-sep" />
+            <button className="zones-toggle" onClick={() => setZonesOpen(v => !v)}>
+              Ver las 27 comunas {zonesOpen ? '▲' : '▼'}
+            </button>
             <div className="zl-price">
               Despacho <strong>$2.990</strong> · Mínimo $20.000
             </div>
           </div>
+          {zonesOpen && (
+            <div className="zones-commune-grid">
+              {COMMUNES_WITH_DELIVERY.map(c => (
+                <div key={c} className="zc-item">
+                  <span className="zl-dot" style={{ background: '#22C55E' }} />
+                  {c}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </FadeUp>
 

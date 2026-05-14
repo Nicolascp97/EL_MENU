@@ -287,44 +287,6 @@ export default function ZonesMap() {
       {/* Leaflet map */}
       <div ref={mapContainer} style={{ width:'100%', height:'100%' }} />
 
-      {/* Store card */}
-      <div style={{
-        position:'absolute', bottom:20, left:12, zIndex:1000, pointerEvents:'auto',
-        ...glass,
-        borderRadius:16,
-        padding:'12px 14px',
-        maxWidth:224,
-      }}>
-        <div style={{ display:'flex', alignItems:'center', gap:9, marginBottom:7 }}>
-          <img
-            src="/logo/elmenu-color.png"
-            alt="El Menú"
-            style={{ width:32, height:32, objectFit:'contain', flexShrink:0 }}
-          />
-          <div>
-            <div style={{ fontSize:12, fontWeight:700, color:'#1B2B1E', letterSpacing:'.03em', fontFamily:'Inter,system-ui,sans-serif' }}>
-              EL MENÚ
-            </div>
-            <div style={{ fontSize:10, color:'#6B7A6F', marginTop:1, fontFamily:'Inter,system-ui,sans-serif' }}>
-              Los Olmos 3967, Macul
-            </div>
-          </div>
-        </div>
-        <p style={{ fontSize:10, color:'#6B7A6F', margin:'0 0 9px', lineHeight:1.5, fontFamily:'Inter,system-ui,sans-serif' }}>
-          Despachos en comunas seleccionadas de Santiago
-        </p>
-        <button
-          onClick={() => mapRef.current?.setView(CENTER, ZOOM, { animate: true })}
-          style={{
-            display:'block', width:'100%', padding:'7px 0',
-            background:'#1B2B1E', color:'#fff', border:0, borderRadius:9,
-            fontSize:11, fontWeight:600, cursor:'pointer',
-            fontFamily:'Inter,system-ui,sans-serif', letterSpacing:'.02em',
-          }}
-        >
-          Ver cobertura
-        </button>
-      </div>
 
     </div>
   )
