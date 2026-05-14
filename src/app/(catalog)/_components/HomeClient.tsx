@@ -1086,13 +1086,6 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
           </div>
           <div className="foot-bottom">
             <div>© 2026 El Menú SpA · Todos los derechos reservados</div>
-            <div className="pays">
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,.5)', marginRight: 6 }}>Pagamos con:</span>
-              <span className="pay-chip">Webpay</span>
-              <span className="pay-chip">Khipu</span>
-              <span className="pay-chip">Flow</span>
-              <span className="pay-chip">Mercado Pago</span>
-            </div>
           </div>
         </div>
       </footer>
