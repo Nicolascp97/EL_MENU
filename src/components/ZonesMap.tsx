@@ -1,35 +1,30 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import 'leaflet/dist/leaflet.css'
 
-/* ── norm: lowercase + remove diacritics + remove spaces ────────────
-   GADM NAME_3 has no spaces ("ElBosque", "LasCondes"), so we strip
-   spaces from both sides when matching.                              */
 function norm(s: string): string {
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '')
 }
 
-/* ── Available communes (norm keys, no spaces, no accents) ──────── */
+/* 21 comunas disponibles (se eliminaron: pudahuel, quilicura, renca, huechuraba, independencia, recoleta) */
 const AVAILABLE = new Set([
   'providencia','nunoa','lascondes','vitacura','lobarnechea','lareina',
-  'santiago','recoleta','independencia','renca','quilicura','huechuraba',
-  'pudahuel','estacioncentral','cerrillos','maipu',
+  'santiago',
+  'estacioncentral','cerrillos','maipu',
   'macul','penalolen','laflorida','puentealto','sanjoaquin','sanmiguel',
   'lacisterna','elbosque','lagranja','sanramon','pedroaguirrecerda',
 ])
 
-/* Display names for autocomplete — sorted A→Z */
 const COMMUNE_LIST = [
-  'Cerrillos','El Bosque','Estación Central','Huechuraba','Independencia',
+  'Cerrillos','El Bosque','Estación Central',
   'La Cisterna','La Florida','La Granja','La Reina','Las Condes',
   'Lo Barnechea','Macul','Maipú','Ñuñoa','Pedro Aguirre Cerda',
-  'Peñalolén','Providencia','Pudahuel','Puente Alto','Quilicura',
-  'Recoleta','Renca','San Joaquín','San Miguel','San Ramón',
+  'Peñalolén','Providencia','Puente Alto',
+  'San Joaquín','San Miguel','San Ramón',
   'Santiago','Vitacura',
 ].sort()
 
-/* ── Layer styles ────────────────────────────────────────────────── */
 const S_AVAIL   = { fillColor:'#22C55E', fillOpacity:0.38, color:'#16A34A', weight:1.5, opacity:0.70 }
 const S_UNAVAIL = { fillColor:'#94A3B8', fillOpacity:0.15, color:'#CBD5E1', weight:0.6, opacity:0.45 }
 const S_HOVER   = { fillOpacity:0.55, weight:2.0 }
@@ -39,29 +34,12 @@ const BIZ: [number, number]    = [-33.490, -70.598]
 const CENTER: [number, number] = [-33.47,  -70.64]
 const ZOOM = 10
 
-const glass: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.93)',
-  backdropFilter: 'blur(18px)',
-  WebkitBackdropFilter: 'blur(18px)',
-  boxShadow: '0 4px 24px rgba(0,0,0,0.09),0 1px 4px rgba(0,0,0,0.05)',
-}
-
 export default function ZonesMap() {
   const mapContainer = useRef<HTMLDivElement>(null)
   const mapRef       = useRef<any>(null)
   const layersRef    = useRef<Record<string, any>>({})
   const hiRef        = useRef<string | null>(null)
   const timerRef     = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const [search, setSearch] = useState('')
-  const [open, setOpen]     = useState(false)
-  const [status, setStatus] = useState<'idle'|'found'|'notfound'>('idle')
-
-  const suggestions = useMemo(() => {
-    const q = norm(search)
-    if (!q) return []
-    return COMMUNE_LIST.filter(n => norm(n).includes(q)).slice(0, 6)
-  }, [search])
 
   const flyTo = useCallback((name: string) => {
     const key   = norm(name)
@@ -78,10 +56,6 @@ export default function ZonesMap() {
     layer.openPopup()
     hiRef.current = key
 
-    setStatus(AVAILABLE.has(key) ? 'found' : 'notfound')
-    setSearch(name)
-    setOpen(false)
-
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = setTimeout(() => {
       const l = layersRef.current[key]
@@ -89,21 +63,6 @@ export default function ZonesMap() {
       hiRef.current = null
     }, 3500)
   }, [])
-
-  const handleSearch = useCallback(() => {
-    const q = norm(search)
-    if (!q) return
-    const match =
-      COMMUNE_LIST.find(n => norm(n) === q) ??
-      COMMUNE_LIST.find(n => norm(n).startsWith(q)) ??
-      COMMUNE_LIST.find(n => norm(n).includes(q))
-    if (match) {
-      flyTo(match)
-    } else {
-      setStatus('notfound')
-      setOpen(false)
-    }
-  }, [search, flyTo])
 
   useEffect(() => {
     const container = mapContainer.current
@@ -133,7 +92,6 @@ export default function ZonesMap() {
       }).addTo(map)
 
       try {
-        /* Local file — no external dependency, no 404 risk */
         const res = await fetch('/comunal-rm.geojson')
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data: any = await res.json()
@@ -150,7 +108,6 @@ export default function ZonesMap() {
 
             layersRef.current[key] = layer
 
-            /* Use proper display name from COMMUNE_LIST if possible */
             const displayName = COMMUNE_LIST.find(n => norm(n) === key) ?? raw
 
             if (avail) {
@@ -202,91 +159,63 @@ export default function ZonesMap() {
   }, [])
 
   return (
-    <div style={{ position:'relative', width:'100%', height:'100%' }}>
+    <div style={{ display:'flex', width:'100%', height:'100%' }}>
 
-      {/* Search bar */}
-      <div style={{ position:'absolute', top:12, left:12, right:12, zIndex:1000, pointerEvents:'auto' }}>
-        <div style={{ ...glass, borderRadius:14, overflow:'hidden' }}>
-
-          <div style={{ display:'flex', alignItems:'center', paddingLeft:13, paddingRight:6 }}>
-            <svg width="15" height="15" fill="none" stroke="#9CA3AF" strokeWidth="2"
-              strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" style={{ flexShrink:0 }}>
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <input
-              type="text"
-              value={search}
-              onChange={e => { setSearch(e.target.value); setOpen(true); setStatus('idle') }}
-              onKeyDown={e => e.key === 'Enter' && handleSearch()}
-              onFocus={() => search && setOpen(true)}
-              placeholder="¿Tu comuna tiene despacho?"
-              style={{
-                flex:1, height:44, border:0, background:'transparent',
-                fontSize:14, color:'#1B2B1E', outline:'none',
-                padding:'0 10px',
-                fontFamily:'Inter,system-ui,sans-serif',
-                WebkitAppearance:'none',
-              }}
-            />
-            {search && (
-              <button
-                onMouseDown={e => e.preventDefault()}
-                onClick={() => { setSearch(''); setStatus('idle'); setOpen(false) }}
-                aria-label="Limpiar"
-                style={{ border:0, background:'none', cursor:'pointer', padding:'0 7px', color:'#9CA3AF', lineHeight:1, flexShrink:0 }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {open && suggestions.length > 0 && (
-            <div style={{ borderTop:'1px solid rgba(0,0,0,0.05)' }}>
-              {suggestions.map(name => (
-                <button
-                  key={name}
-                  onMouseDown={e => e.preventDefault()}
-                  onClick={() => flyTo(name)}
-                  style={{
-                    display:'flex', alignItems:'center', gap:9,
-                    width:'100%', padding:'10px 14px',
-                    background:'none', border:0, cursor:'pointer',
-                    textAlign:'left', fontSize:13, color:'#1B2B1E',
-                    fontFamily:'Inter,system-ui,sans-serif',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(34,197,94,.07)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                >
-                  <span style={{ width:6, height:6, borderRadius:'50%', background:'#22C55E', flexShrink:0 }} />
-                  {name}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {status !== 'idle' && (
-            <div style={{
-              display:'flex', alignItems:'center', gap:7,
-              padding:'9px 14px',
-              borderTop:'1px solid rgba(0,0,0,0.05)',
-              fontSize:12, fontWeight:600,
-              color: status === 'found' ? '#15803D' : '#B91C1C',
-              background: status === 'found' ? 'rgba(34,197,94,.06)' : 'rgba(239,68,68,.05)',
-              fontFamily:'Inter,system-ui,sans-serif',
-            }}>
-              {status === 'found'
-                ? <><span>🚚</span><span>Sí, hacemos despacho a esa comuna</span></>
-                : <><span style={{ fontSize:11 }}>✕</span><span>Aún no llegamos a esa zona</span></>}
-            </div>
-          )}
-        </div>
+      {/* Sidebar: lista de comunas siempre visible */}
+      <div style={{
+        width: 200,
+        flexShrink: 0,
+        overflowY: 'auto',
+        background: 'rgba(255,255,255,0.97)',
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
+        borderRight: '1px solid rgba(0,0,0,0.07)',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        <p style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: '.10em',
+          textTransform: 'uppercase',
+          color: '#6B7A6F',
+          padding: '14px 14px 8px',
+          fontFamily: 'Inter,system-ui,sans-serif',
+          borderBottom: '1px solid rgba(0,0,0,0.05)',
+          flexShrink: 0,
+        }}>
+          Comunas con despacho
+        </p>
+        {COMMUNE_LIST.map(name => (
+          <button
+            key={name}
+            onClick={() => flyTo(name)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 9,
+              width: '100%',
+              padding: '9px 14px',
+              background: 'none',
+              border: 0,
+              cursor: 'pointer',
+              textAlign: 'left',
+              fontSize: 12,
+              color: '#1B2B1E',
+              fontFamily: 'Inter,system-ui,sans-serif',
+              flexShrink: 0,
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(34,197,94,.09)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
+            {name}
+          </button>
+        ))}
       </div>
 
-      {/* Leaflet map */}
-      <div ref={mapContainer} style={{ width:'100%', height:'100%' }} />
-
+      {/* Mapa Leaflet */}
+      <div ref={mapContainer} style={{ flex: 1, height: '100%' }} />
 
     </div>
   )

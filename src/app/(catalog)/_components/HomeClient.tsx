@@ -31,6 +31,7 @@ const CSS = `
     --ink:#1B2B1E;
     --warm:#F5872A; --warm-600:#D96B12; --warm-100:#FDE6CC;
     --gold-700:#C4811A; --gold-50:#FBF6E9; --gold-100:#FDF1DC;
+    --orange:#E8621A; --orange-dk:#C44F0E; --orange-light:#FDE8D8;
     --danger:#C44536;
     --radius-sm:8px; --radius-md:14px; --radius-lg:22px; --radius-xl:28px;
     --shadow-xs: 0 1px 2px rgba(27,43,30,.04);
@@ -100,39 +101,15 @@ const CSS = `
   .section-head .view-all:hover { color: var(--green-900); }
   .section-eye { font-size: 12px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase; color: var(--green-700); margin-bottom: 8px; display: inline-block; }
 
-  /* HERO DUAL */
+  /* HERO CIRCLES */
   .hero { padding: 40px 0 24px; }
-  .hero-dual { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-  .hero-door { position: relative; border-radius: var(--radius-xl); overflow: hidden; padding: 48px 44px; min-height: 460px; display: flex; flex-direction: column; justify-content: space-between; transition: transform .25s ease, box-shadow .25s ease; box-shadow: var(--shadow-sm); }
-  .hero-door:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
-  .hero-door::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0); background-size: 22px 22px; pointer-events: none; opacity: .04; }
-  .hero-door .door-eye { position: relative; font-size: 11px; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; display: inline-flex; align-items: center; gap: 8px; align-self: flex-start; padding: 7px 13px; border-radius: 100px; }
-  .hero-door .door-emoji { position: relative; font-size: 72px; line-height: 1; margin-top: 22px; }
-  .hero-door h2 { position: relative; font-size: clamp(32px, 3.6vw, 46px); line-height: 1; margin-top: 16px; max-width: 12ch; }
-  .hero-door h2 em { font-style: italic; font-weight: 500; }
-  .hero-door .door-desc { position: relative; margin-top: 14px; max-width: 36ch; font-size: 15px; line-height: 1.5; }
-  .hero-door .door-meta { position: relative; margin-top: 22px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; font-weight: 500; }
-  .hero-door .door-meta span { display: inline-flex; align-items: center; gap: 10px; }
-  .hero-door .door-meta .chk { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; }
-  .hero-door .door-cta { position: relative; display: inline-flex; align-items: center; gap: 10px; margin-top: 28px; height: 52px; padding: 0 26px; border-radius: 100px; font-weight: 600; font-size: 15px; align-self: flex-start; transition: all .15s ease; box-shadow: var(--shadow-sm); }
-  .hero-door .door-cta:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-
-  .hero-door.retail { background: radial-gradient(circle at 85% 15%, rgba(116,198,157,.32), transparent 55%), linear-gradient(135deg, #EFF8F1 0%, #D8F3DC 100%); color: var(--green-900); }
-  .hero-door.retail .door-eye { background: rgba(45,106,79,.12); color: var(--green-700); }
-  .hero-door.retail h2 em { color: var(--green-700); }
-  .hero-door.retail .door-desc { color: var(--gray-700); }
-  .hero-door.retail .door-meta .chk { background: rgba(45,106,79,.15); color: var(--green-700); }
-  .hero-door.retail .door-cta { background: var(--green-700); color: #fff; }
-  .hero-door.retail .door-cta:hover { background: var(--green-900); }
-
-  .hero-door.wholesale { background: radial-gradient(circle at 85% 15%, rgba(196,129,26,.22), transparent 55%), linear-gradient(135deg, #FBF6E9 0%, #FDF1DC 100%); color: #5C3E0A; }
-  .hero-door.wholesale h2 { color: #5C3E0A; }
-  .hero-door.wholesale .door-eye { background: rgba(196,129,26,.14); color: var(--gold-700); }
-  .hero-door.wholesale h2 em { color: var(--gold-700); }
-  .hero-door.wholesale .door-desc { color: #7A5719; }
-  .hero-door.wholesale .door-meta .chk { background: rgba(196,129,26,.18); color: var(--gold-700); }
-  .hero-door.wholesale .door-cta { background: var(--gold-700); color: #fff; }
-  .hero-door.wholesale .door-cta:hover { background: #9C660E; }
+  .hero-circles { display: flex; gap: 40px; justify-content: center; align-items: center; padding: 32px 0; flex-wrap: wrap; }
+  .hero-circle { width: 280px; height: 280px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-decoration: none; transition: transform .2s ease-out, box-shadow .2s ease-out; box-shadow: var(--shadow-md); cursor: pointer; }
+  .hero-circle:hover { transform: scale(1.06); box-shadow: var(--shadow-lg); }
+  .hero-circle .circle-icon { width: 52px; height: 52px; display: grid; place-items: center; }
+  .hero-circle .circle-label { font-size: 18px; font-weight: 700; text-align: center; line-height: 1.2; }
+  .hero-circle.retail { background: var(--green-900); color: #fff; }
+  .hero-circle.wholesale { background: var(--orange); color: #fff; }
 
   /* SEARCH STRIP under hero */
   .hero-search-strip { margin-top: 28px; display: flex; gap: 10px; background: #fff; padding: 8px; border-radius: 100px; box-shadow: var(--shadow-md); max-width: 720px; margin-left: auto; margin-right: auto; }
@@ -336,7 +313,6 @@ const CSS = `
 
   /* RESPONSIVE */
   @media (max-width: 1024px) {
-    .hero-dual { grid-template-columns: 1fr; }
     .trust-strip { grid-template-columns: 1fr 1fr; }
     .zones-frame { height: 460px; }
     .zones-commune-grid { grid-template-columns: repeat(3, 1fr); }
@@ -361,7 +337,8 @@ const CSS = `
     .menu-btn { display: none; }
     .nav-right { order: 2; margin-left: auto; }
     .logo { order: 3; }
-    .hero-door { padding: 32px 24px; min-height: 380px; }
+    .hero-circle { width: 220px; height: 220px; }
+    .hero-circle .circle-label { font-size: 16px; }
     .trust-strip { grid-template-columns: 1fr; padding: 22px 24px; }
     .ai-section { padding: 40px 24px; }
     .b2b { padding: 28px; }
@@ -381,8 +358,6 @@ const CSS = `
     /* — search strip mobile: icon only — */
     .hero-search-strip .btn-txt { display: none; }
     .hero-search-strip button { padding: 0 14px; min-width: 52px; justify-content: center; }
-    /* — hero CTA full width — */
-    .hero-door .door-cta { align-self: stretch; justify-content: center; }
     /* — cat pills fade indicator — */
     .cats-nav { position: relative; }
     .cats-nav::after { content: ''; position: absolute; right: 0; top: 0; bottom: 1px; width: 52px; background: linear-gradient(to right, transparent, white 85%); pointer-events: none; z-index: 1; }
@@ -473,7 +448,7 @@ const IcoX = ({ size = 18 }: { size?: number }) => <svg width={size} height={siz
 const HOW_STEPS = [
   { cls: 'q', emoji: '🛒', num: '01', title: 'Elige tu pedido', desc: 'En la web o por WhatsApp. Con Meni, nuestro asistente IA, o armándolo tú mismo.' },
   { cls: 's', emoji: '💳', num: '02', title: 'Paga en segundos', desc: 'Webpay Plus de Transbank. Confirmación instantánea, sin esperas ni sorpresas.' },
-  { cls: 'l', emoji: '🚚', num: '03', title: 'Despachamos ese día', desc: 'Pedidos antes de las 16:00 salen ese mismo día a las 27 comunas que cubrimos.' },
+  { cls: 'l', emoji: '🚚', num: '03', title: 'Despachamos ese día', desc: 'Pedidos antes de las 16:00 salen ese mismo día a las 21 comunas que cubrimos.' },
   { cls: 'c', emoji: '🌿', num: '04', title: 'Recibes fresco', desc: 'Garantía de frescura. Si algo no llega en punto, lo cambiamos o te devolvemos el dinero.' },
 ]
 
@@ -722,40 +697,17 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
         </div>
       </div>
 
-      {/* ═══ 1. HERO DUAL ═══ */}
+      {/* ═══ 1. HERO CIRCLES ═══ */}
       <section className="hero">
         <div className="container">
-          <div className="hero-dual">
-            {/* Puerta 1 · Minorista */}
-            <Link href="/catalogo" className="hero-door retail">
-              <div>
-                <span className="door-eye"><IcoHouse size={14} /> Para mi casa</span>
-                <div className="door-emoji">🥑</div>
-                <h2>Frescos <em>directo</em> a tu puerta.</h2>
-                <p className="door-desc">Frutas y verduras seleccionadas cada mañana en Lo Valledor, despachadas a 27 comunas seleccionadas de Santiago.</p>
-                <div className="door-meta">
-                  <span><span className="chk"><IcoCheck /></span> Pedido mínimo $20.000</span>
-                  <span><span className="chk"><IcoCheck /></span> Despacho $2.990 en 27 comunas</span>
-                  <span><span className="chk"><IcoCheck /></span> Pide hasta las 16:00, recibe hoy</span>
-                </div>
-              </div>
-              <span className="door-cta">Ver catálogo minorista <IcoArrow size={16} /></span>
+          <div className="hero-circles">
+            <Link href="/catalogo" className="hero-circle retail" aria-label="Para mi casa – ver catálogo minorista">
+              <div className="circle-icon"><IcoHouse size={44} /></div>
+              <span className="circle-label">Para mi casa</span>
             </Link>
-
-            {/* Puerta 2 · Mayorista */}
-            <Link href="/mayorista" className="hero-door wholesale">
-              <div>
-                <span className="door-eye"><IcoStore size={14} /> Para mi negocio</span>
-                <div className="door-emoji">🏪</div>
-                <h2>Precios <em>mayoristas</em> con servicio de oficina.</h2>
-                <p className="door-desc">Restaurantes, almacenes y verdulerías: compra por caja o bulto con facturación electrónica inmediata.</p>
-                <div className="door-meta">
-                  <span><span className="chk"><IcoCheck /></span> Precios por caja y volumen</span>
-                  <span><span className="chk"><IcoCheck /></span> Factura electrónica al instante</span>
-                  <span><span className="chk"><IcoCheck /></span> Entrega antes de las 7:00 AM</span>
-                </div>
-              </div>
-              <span className="door-cta">Ver catálogo mayorista <IcoArrow size={16} /></span>
+            <Link href="/mayorista" className="hero-circle wholesale" aria-label="Para mi negocio – ver catálogo mayorista">
+              <div className="circle-icon"><IcoStore size={44} /></div>
+              <span className="circle-label">Para mi negocio</span>
             </Link>
           </div>
 
@@ -845,7 +797,7 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
               <span className="section-eye"><IcoTruck size={14} /> Cobertura</span>
               <h2>¿Llegamos a tu comuna?</h2>
               <p style={{ color: 'var(--gray-500)', fontSize: 14, marginTop: 8 }}>
-                Cubrimos 27 comunas de Santiago. Búscala directamente en el mapa.
+                Cubrimos 21 comunas de Santiago. Haz clic en cualquiera para verla en el mapa.
               </p>
             </div>
           </div>
@@ -863,7 +815,7 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
             </div>
             <div className="zl-sep" />
             <button className="zones-toggle" onClick={() => setZonesOpen(v => !v)}>
-              Ver las 27 comunas {zonesOpen ? '▲' : '▼'}
+              Ver las 21 comunas {zonesOpen ? '▲' : '▼'}
             </button>
             <div className="zl-price">
               Despacho <strong>$2.990</strong> · Mínimo $20.000
@@ -1053,7 +1005,7 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
               <div className="logo" style={{ marginBottom: 8 }}>
                 <img src="/logo/elmenu-white.png" alt="El Menú" style={{ height: 64 }} />
               </div>
-              <p>Del huerto a tu puerta. Frutas y verduras frescas seleccionadas cada mañana en Lo Valledor, despachadas a toda la Región Metropolitana.</p>
+              <p>Hay cosas que no se apuran: la fruta madura en la rama, el campo despierta de mañana. Nosotros solo los traemos frescos hasta ti.</p>
               <div className="socials">
                 <a href="https://www.instagram.com/el_menu._" target="_blank" rel="noopener noreferrer" aria-label="Instagram"><IcoIg /></a>
                 <a href="https://www.facebook.com/share/17gVgD319J/" target="_blank" rel="noopener noreferrer" aria-label="Facebook"><IcoFb /></a>

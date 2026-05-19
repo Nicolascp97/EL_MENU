@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { CreditCard, Lock, ShieldCheck } from 'lucide-react'
+import { CreditCard, Lock, ShieldCheck, Banknote, MessageCircle } from 'lucide-react'
 import { useCart } from '@/hooks/useCart'
 import { formatPrice } from '@/lib/utils'
 import OrderSummary from './OrderSummary'
@@ -17,6 +17,9 @@ type Props = {
   initialAddress: string | null
 }
 
+const ORANGE = '#E8621A'
+const ORANGE_DK = '#C44F0E'
+
 export default function CheckoutClient({
   zones,
   userRole,
@@ -30,29 +33,30 @@ export default function CheckoutClient({
   const total = useCart(s => s.total)
   const clearCart = useCart(s => s.clearCart)
 
-  // Hydration safety: solo confiamos en useCart después del mount.
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
 
-  // Comuna seleccionada → encontramos la zone que la contiene.
   const allCommunes = useMemo(() => {
     const set = new Set<string>()
     zones.forEach(z => z.communes.forEach(c => set.add(c)))
     return Array.from(set).sort()
   }, [zones])
 
-  const [name, setName] = useState(initialName ?? '')
-  const [phone, setPhone] = useState(initialPhone ?? '')
+  const [name, setName]       = useState(initialName ?? '')
+  const [phone, setPhone]     = useState(initialPhone ?? '')
   const [address, setAddress] = useState(initialAddress ?? '')
   const [commune, setCommune] = useState(allCommunes[0] ?? '')
-  const [notes, setNotes] = useState('')
+  const [notes, setNotes]     = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<'webpay' | 'transfer'>('webpay')
 
   const selectedZone = useMemo(
     () => zones.find(z => z.communes.includes(commune)) ?? null,
     [zones, commune]
   )
+
+  const grandTotal = mounted ? total() + (selectedZone?.delivery_price ?? 0) : 0
 
   if (mounted && items.length === 0) {
     return (
@@ -77,6 +81,27 @@ export default function CheckoutClient({
     setLoading(true)
 
     try {
+      if (paymentMethod === 'transfer') {
+        const res = await fetch('/api/checkout/transfer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            items: items.map(i => ({ product_id: i.product.id, qty: i.qty })),
+            address: address.trim(),
+            commune,
+            phone: phone.trim(),
+            name: name.trim(),
+            notes: notes.trim() || undefined,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data?.error ?? 'No se pudo registrar el pedido.')
+        clearCart()
+        router.push(`/checkout/confirmacion?status=transfer&orderId=${data.orderId}`)
+        return
+      }
+
+      // Webpay flow
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -90,15 +115,10 @@ export default function CheckoutClient({
       })
 
       const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data?.error ?? 'No se pudo iniciar el pago.')
-      }
+      if (!res.ok) throw new Error(data?.error ?? 'No se pudo iniciar el pago.')
 
-      // Vaciamos el carrito antes de redirigir — si el usuario cancela el pago,
-      // siempre puede repetir el flujo desde /catalogo.
       clearCart()
 
-      // Construimos un form que postea token_ws a la URL de Transbank.
       const form = document.createElement('form')
       form.method = 'POST'
       form.action = data.url
@@ -169,6 +189,58 @@ export default function CheckoutClient({
           </div>
         </section>
 
+        {/* ── Método de pago ── */}
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-gray-900">Método de pago</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <PayMethodCard
+              selected={paymentMethod === 'webpay'}
+              onClick={() => setPaymentMethod('webpay')}
+              icon={<CreditCard size={20} />}
+              label="Webpay / Tarjeta"
+              sublabel="Débito, crédito y prepago"
+            />
+            <PayMethodCard
+              selected={paymentMethod === 'transfer'}
+              onClick={() => setPaymentMethod('transfer')}
+              icon={<Banknote size={20} />}
+              label="Transferencia"
+              sublabel="Datos bancarios al confirmar"
+            />
+          </div>
+
+          {paymentMethod === 'transfer' && (
+            <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3 text-sm">
+              <p className="font-semibold text-orange-900">Datos para la transferencia</p>
+              <dl className="space-y-1 text-gray-700">
+                <div className="flex gap-2"><dt className="text-gray-500 w-28 shrink-0">Banco</dt><dd>Banco de Chile</dd></div>
+                <div className="flex gap-2"><dt className="text-gray-500 w-28 shrink-0">Tipo de cuenta</dt><dd>Cuenta Corriente</dd></div>
+                {/* TODO: Celso debe completar estos datos */}
+                <div className="flex gap-2"><dt className="text-gray-500 w-28 shrink-0">N° de cuenta</dt><dd className="font-mono">— Consultar a Celso —</dd></div>
+                <div className="flex gap-2"><dt className="text-gray-500 w-28 shrink-0">RUT titular</dt><dd className="font-mono">— Consultar a Celso —</dd></div>
+                <div className="flex gap-2"><dt className="text-gray-500 w-28 shrink-0">Nombre</dt><dd>El Menú SpA</dd></div>
+                <div className="flex gap-2"><dt className="text-gray-500 w-28 shrink-0">Email</dt><dd>— Consultar a Celso —</dd></div>
+                {mounted && (
+                  <div className="flex gap-2 pt-1 border-t border-orange-200">
+                    <dt className="text-gray-500 w-28 shrink-0">Monto</dt>
+                    <dd className="font-bold text-orange-900">{formatPrice(grandTotal)}</dd>
+                  </div>
+                )}
+                {name && (
+                  <div className="flex gap-2">
+                    <dt className="text-gray-500 w-28 shrink-0">Asunto</dt>
+                    <dd>Pedido {name}</dd>
+                  </div>
+                )}
+              </dl>
+              <div className="flex items-start gap-2 text-orange-800 bg-orange-100 rounded-lg p-3">
+                <MessageCircle size={16} className="shrink-0 mt-0.5" />
+                <p>Una vez realizada la transferencia, envía el comprobante por WhatsApp al <strong>+56 9 5495 2395</strong> para confirmar tu pedido.</p>
+              </div>
+            </div>
+          )}
+        </section>
+
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-800 text-sm rounded-xl px-3 py-2">
             {error}
@@ -179,28 +251,63 @@ export default function CheckoutClient({
           <button
             type="submit"
             disabled={loading || !mounted}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold text-white disabled:opacity-60 transition-opacity"
-            style={{ background: '#1B2B1E' }}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold text-white disabled:opacity-60 transition-all"
+            style={{ background: loading ? ORANGE_DK : ORANGE }}
+            onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = ORANGE_DK }}
+            onMouseLeave={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = ORANGE }}
           >
             {loading ? (
-              <>Iniciando pago…</>
-            ) : mounted ? (
-              <>
-                <CreditCard size={16} /> Pagar {formatPrice(total() + (selectedZone?.delivery_price ?? 0))} con Webpay
-              </>
-            ) : (
+              <>Procesando…</>
+            ) : !mounted ? (
               <>Cargando carrito…</>
+            ) : paymentMethod === 'webpay' ? (
+              <><CreditCard size={16} /> Pagar {formatPrice(grandTotal)} con Webpay</>
+            ) : (
+              <><Banknote size={16} /> Confirmar pedido · {formatPrice(grandTotal)}</>
             )}
           </button>
 
           <p className="text-[11px] text-gray-500 inline-flex items-center justify-center gap-1.5">
-            <Lock size={12} /> Pago seguro · <ShieldCheck size={12} /> Webpay Plus de Transbank
+            {paymentMethod === 'webpay'
+              ? <><Lock size={12} /> Pago seguro · <ShieldCheck size={12} /> Webpay Plus de Transbank</>
+              : <><Lock size={12} /> Pedido seguro · Tu información está protegida</>
+            }
           </p>
         </div>
       </form>
 
       <OrderSummary zone={selectedZone} userRole={userRole} />
     </div>
+  )
+}
+
+function PayMethodCard({
+  selected,
+  onClick,
+  icon,
+  label,
+  sublabel,
+}: {
+  selected: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+  sublabel: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-col items-start gap-1.5 p-3 rounded-xl border-2 text-left transition-all cursor-pointer"
+      style={{
+        borderColor: selected ? ORANGE : '#E5E7EB',
+        background: selected ? '#FDE8D8' : '#fff',
+      }}
+    >
+      <span style={{ color: selected ? ORANGE : '#6B7280' }}>{icon}</span>
+      <span className="text-sm font-semibold text-gray-900">{label}</span>
+      <span className="text-xs text-gray-500">{sublabel}</span>
+    </button>
   )
 }
 
