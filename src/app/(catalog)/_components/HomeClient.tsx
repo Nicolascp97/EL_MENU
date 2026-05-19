@@ -103,7 +103,7 @@ const CSS = `
 
   /* HERO CIRCLES */
   .hero { padding: 40px 0 24px; }
-  .hero-circles { display: flex; gap: 40px; justify-content: center; align-items: center; padding: 32px 0; flex-wrap: wrap; }
+  .hero-circles { display: flex; gap: 40px; justify-content: center; align-items: center; padding: 32px 0; }
   .hero-circle { width: 280px; height: 280px; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-decoration: none; transition: transform .2s ease-out, box-shadow .2s ease-out; box-shadow: var(--shadow-md); cursor: pointer; }
   .hero-circle:hover { transform: scale(1.06); box-shadow: var(--shadow-lg); }
   .hero-circle .circle-icon { width: 52px; height: 52px; display: grid; place-items: center; }
@@ -338,8 +338,11 @@ const CSS = `
     .menu-btn { display: none; }
     .nav-right { order: 2; margin-left: auto; }
     .logo { order: 3; }
-    .hero-circle { width: 220px; height: 220px; }
-    .hero-circle .circle-label { font-size: 16px; }
+    .hero-circles { gap: 18px; padding: 20px 8px; }
+    .hero-circle { width: 150px; height: 150px; gap: 10px; }
+    .hero-circle .circle-icon svg { width: 32px; height: 32px; }
+    .hero-circle .circle-label { font-size: 14px; }
+    .hero-circle .circle-cta { font-size: 10px; }
     .trust-strip { grid-template-columns: 1fr; padding: 22px 24px; }
     .ai-section { padding: 40px 24px; }
     .b2b { padding: 28px; }
