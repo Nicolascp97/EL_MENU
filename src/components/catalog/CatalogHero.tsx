@@ -45,12 +45,11 @@ const CONFIG: Record<Mode, {
   mayorista: {
     tag: 'CATÁLOGO MAYORISTA',
     title: 'Precios al por mayor para tu negocio.',
-    subtitle: 'Restaurantes, cafeterías, ferias y minimarkets. Compramos en volumen cada madrugada y te entregamos antes de las 7 AM con factura electrónica al instante.',
+    subtitle: 'Tu local abre con lo mejor del día. Dejamos frutas y verduras frescas en tu cocina antes de que lleguen tus clientes, con factura electrónica al instante.',
     rules: [
       { icon: <Truck size={14} />, text: 'Pedido mínimo $60.000' },
       { icon: <FileText size={14} />, text: 'Factura electrónica' },
-      { icon: <Clock size={14} />, text: 'Entrega < 7 AM' },
-      { icon: <Sparkles size={14} />, text: 'Crédito 30 días' },
+      { icon: <Clock size={14} />, text: 'Pide hoy, recibe mañana' },
     ],
     accent: '#C4811A',
     accentSoft: '#FDF1DC',
