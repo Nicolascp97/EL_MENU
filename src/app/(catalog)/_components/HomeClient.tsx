@@ -5,9 +5,12 @@ import { useRouter } from 'next/navigation'
 import UserMenu from '@/components/auth/UserMenu'
 import { createClient } from '@/lib/supabase/client'
 import type { UserRole, Product, Recipe } from '@/types/database'
+import dynamic from 'next/dynamic'
 import { useCart } from '@/hooks/useCart'
 import { useChatStore } from '@/hooks/useChatStore'
 import RecipesSection from './RecipesSection'
+
+const ZonesMap = dynamic(() => import('@/components/ZonesMap'), { ssr: false })
 
 const COMMUNES_WITH_DELIVERY = [
   'Cerrillos','El Bosque','Estación Central',
@@ -800,38 +803,32 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
               <span className="section-eye"><IcoTruck size={14} /> Cobertura</span>
               <h2>¿Llegamos a tu comuna?</h2>
               <p style={{ color: 'var(--gray-500)', fontSize: 14, marginTop: 8 }}>
-                21 comunas de Santiago con despacho a domicilio.
+                Cubrimos 21 comunas de Santiago.
               </p>
             </div>
           </div>
-
-          {/* Info bar */}
-          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 24, padding: '12px 20px', background: 'var(--green-50)', borderRadius: 'var(--radius-md)', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
-              <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 600 }}>21 comunas cubiertas</span>
-            </div>
-            <span style={{ fontSize: 13, color: 'var(--gray-500)' }}>Despacho <strong style={{ color: 'var(--ink)' }}>$2.990</strong></span>
-            <span style={{ fontSize: 13, color: 'var(--gray-500)' }}>Mínimo <strong style={{ color: 'var(--ink)' }}>$20.000</strong></span>
+          <div className="zones-frame">
+            <ZonesMap />
           </div>
-
-          {/* Sectores geográficos */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-            {([
-              { sector: 'Oriente', communes: ['Providencia', 'Ñuñoa', 'Macul', 'La Reina', 'Las Condes', 'Vitacura', 'Lo Barnechea'] },
-              { sector: 'Sur',     communes: ['La Florida', 'Peñalolén', 'Puente Alto', 'La Granja', 'La Cisterna', 'El Bosque', 'San Miguel', 'San Joaquín', 'San Ramón', 'Pedro Aguirre Cerda'] },
-              { sector: 'Centro & Poniente', communes: ['Santiago', 'Estación Central', 'Maipú', 'Cerrillos'] },
-            ] as const).map(({ sector, communes }) => (
-              <div key={sector} style={{ background: 'var(--surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--gray-100)', padding: '16px 20px' }}>
-                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--green-700)', margin: '0 0 12px' }}>{sector}</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-                  {communes.map(c => (
-                    <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
-                      <span style={{ fontSize: 13, color: 'var(--ink)' }}>{c}</span>
-                    </div>
-                  ))}
-                </div>
+          <div className="zones-legend">
+            <div className="zl-item">
+              <span className="zl-dot" style={{ background: '#22C55E' }} />
+              Con despacho
+            </div>
+            <div className="zl-item">
+              <span className="zl-dot" style={{ background: '#94A3B8' }} />
+              Sin cobertura aún
+            </div>
+            <div className="zl-sep" />
+            <div className="zl-price">
+              Despacho <strong>$2.990</strong> · Mínimo $20.000
+            </div>
+          </div>
+          <div className="zones-commune-grid">
+            {COMMUNES_WITH_DELIVERY.map(c => (
+              <div key={c} className="zc-item">
+                <span className="zl-dot" style={{ background: '#22C55E' }} />
+                {c}
               </div>
             ))}
           </div>

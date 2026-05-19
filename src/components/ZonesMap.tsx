@@ -51,6 +51,12 @@ export default function ZonesMap() {
         zoom: ZOOM,
         zoomControl: false,
         scrollWheelZoom: false,
+        dragging: false,
+        touchZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false,
+        tap: false,
         attributionControl: true,
       })
       mapRef.current = map
