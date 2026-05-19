@@ -184,6 +184,7 @@ export default function ChatWidget() {
   const { messages, setMessages, isLoading, isOpen, openChat, closeChat, sendMessage } = useChat()
   const { items } = useCart()
   const [input, setInput] = useState('')
+  const [showBubble, setShowBubble] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const processedRef = useRef<Set<string>>(new Set())
 
@@ -191,6 +192,20 @@ export default function ChatWidget() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, isLoading])
+
+  // Auto-show speech bubble after delay, hide when chat opens
+  useEffect(() => {
+    if (isOpen) { setShowBubble(false); return }
+    const t = setTimeout(() => setShowBubble(true), 3500)
+    return () => clearTimeout(t)
+  }, [isOpen])
+
+  // Auto-hide speech bubble after 6s
+  useEffect(() => {
+    if (!showBubble) return
+    const t = setTimeout(() => setShowBubble(false), 6000)
+    return () => clearTimeout(t)
+  }, [showBubble])
 
   // Welcome message on first open
   useEffect(() => {
@@ -277,52 +292,125 @@ export default function ChatWidget() {
           from { opacity: 0; transform: translateY(12px) scale(.97); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
-        .chat-modal {
-          animation: chatSlideIn .2s ease;
+        .chat-modal { animation: chatSlideIn .2s ease; }
+
+        @keyframes bubblePop {
+          from { opacity:0; transform:scale(.88) translateY(8px); }
+          to   { opacity:1; transform:scale(1)   translateY(0);   }
         }
+        .menucito-bubble {
+          animation: bubblePop .28s cubic-bezier(.34,1.56,.64,1);
+          transform-origin: bottom right;
+        }
+
+        @keyframes fabPulse {
+          0%,100% { box-shadow: 0 4px 22px rgba(232,98,26,.5); }
+          50%     { box-shadow: 0 6px 32px rgba(232,98,26,.78), 0 0 0 11px rgba(232,98,26,.1); }
+        }
+        .menucito-fab {
+          animation: fabPulse 3s ease-in-out infinite;
+          transition: transform .15s ease;
+        }
+        .menucito-fab:hover  { transform: scale(1.1) !important; animation-play-state: paused; }
+        .menucito-fab:active { transform: scale(0.94) !important; }
+
         @media (max-width: 480px) {
           .chat-modal {
-            bottom: 0 !important;
-            right: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            max-height: 100dvh !important;
-            height: 100dvh !important;
-            border-radius: 0 !important;
+            bottom: 0 !important; right: 0 !important; left: 0 !important;
+            width: 100% !important; max-height: 100dvh !important;
+            height: 100dvh !important; border-radius: 0 !important;
           }
-          .chat-fab {
-            bottom: 16px !important;
-            right: 16px !important;
-          }
+          .menucito-fab-wrap { bottom: 16px !important; right: 16px !important; }
         }
       `}</style>
 
-      {/* FAB */}
+      {/* FAB — Menucito robot */}
       {!isOpen && (
-        <button
-          className="chat-fab"
-          onClick={() => openChat()}
-          aria-label="Abrir chat con Menucito"
-          style={{
-            position: 'fixed', bottom: 24, right: 24, zIndex: 1000,
-            width: 60, height: 60, borderRadius: '50%',
-            background: '#1B2B1E', border: 'none',
-            boxShadow: '0 4px 20px rgba(0,0,0,.3)',
-            cursor: 'pointer', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: 28,
-            transition: 'transform .15s, box-shadow .15s',
-          }}
-          onMouseEnter={e => {
-            ;(e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.08)'
-            ;(e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 24px rgba(0,0,0,.35)'
-          }}
-          onMouseLeave={e => {
-            ;(e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)'
-            ;(e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 20px rgba(0,0,0,.3)'
-          }}
+        <div
+          className="menucito-fab-wrap"
+          style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}
         >
-          🥦
-        </button>
+          {/* Speech bubble */}
+          {showBubble && (
+            <div
+              className="menucito-bubble"
+              onClick={() => { openChat(); setShowBubble(false) }}
+              style={{
+                background: '#fff',
+                borderRadius: 14,
+                padding: '10px 16px',
+                boxShadow: '0 4px 20px rgba(0,0,0,.13)',
+                fontSize: 14,
+                fontWeight: 600,
+                color: '#1B2B1E',
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                position: 'relative',
+                userSelect: 'none',
+              }}
+            >
+              ¿Te ayudo con tu pedido?
+              {/* Arrow pointing down-right toward FAB */}
+              <span style={{
+                position: 'absolute', bottom: -7, right: 22,
+                width: 0, height: 0,
+                borderLeft: '7px solid transparent',
+                borderRight: '7px solid transparent',
+                borderTop: '7px solid #fff',
+                filter: 'drop-shadow(0 2px 1px rgba(0,0,0,.06))',
+              }} />
+            </div>
+          )}
+
+          {/* Robot button + antenna */}
+          <div style={{ position: 'relative', width: 64, height: 64 }}>
+            {/* Leaf antenna — floats above the button */}
+            <div style={{
+              position: 'absolute', top: -18, left: '50%',
+              transform: 'translateX(-50%)',
+              pointerEvents: 'none', zIndex: 2,
+            }}>
+              <svg width="24" height="20" viewBox="0 0 24 20" fill="none">
+                <line x1="12" y1="20" x2="12" y2="11" stroke="rgba(255,255,255,0.55)" strokeWidth="1.5" strokeLinecap="round"/>
+                <path d="M12 11 C9 6 3 8 4 12 C5 15 10 14 12 11Z" fill="#52B788"/>
+                <path d="M12 11 C15 6 21 8 20 12 C19 15 14 14 12 11Z" fill="#74C69D"/>
+              </svg>
+            </div>
+
+            {/* Main FAB button */}
+            <button
+              className="menucito-fab"
+              onClick={() => { openChat(); setShowBubble(false) }}
+              onMouseEnter={() => setShowBubble(true)}
+              aria-label="Abrir chat con Menucito"
+              style={{
+                width: 64, height: 64, borderRadius: '50%',
+                background: '#E8621A', border: 'none',
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              {/* Robot face SVG */}
+              <svg width="36" height="30" viewBox="0 0 36 30" fill="none" overflow="visible">
+                {/* Head bg */}
+                <rect x="3" y="2" width="30" height="24" rx="7" fill="rgba(255,255,255,0.13)"/>
+                {/* Ear nubs */}
+                <rect x="0" y="10" width="3" height="7" rx="1.5" fill="rgba(255,255,255,0.28)"/>
+                <rect x="33" y="10" width="3" height="7" rx="1.5" fill="rgba(255,255,255,0.28)"/>
+                {/* Left eye */}
+                <circle cx="12" cy="13" r="4.5" fill="white"/>
+                <circle cx="12" cy="13" r="2.4" fill="#1B2B1E"/>
+                <circle cx="13" cy="12" r="0.9" fill="white"/>
+                {/* Right eye */}
+                <circle cx="24" cy="13" r="4.5" fill="white"/>
+                <circle cx="24" cy="13" r="2.4" fill="#1B2B1E"/>
+                <circle cx="25" cy="12" r="0.9" fill="white"/>
+                {/* Smile */}
+                <path d="M10 23 Q18 29 26 23" stroke="rgba(255,255,255,0.82)" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+              </svg>
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Chat modal */}
@@ -345,11 +433,22 @@ export default function ChatWidget() {
           }}>
             <div style={{
               width: 38, height: 38, borderRadius: '50%',
-              background: '#2D6A4F',
+              background: '#E8621A',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 18,
+              flexShrink: 0,
             }}>
-              🥦
+              <svg width="22" height="18" viewBox="0 0 36 30" fill="none">
+                <rect x="3" y="2" width="30" height="24" rx="7" fill="rgba(255,255,255,0.13)"/>
+                <rect x="0" y="10" width="3" height="7" rx="1.5" fill="rgba(255,255,255,0.28)"/>
+                <rect x="33" y="10" width="3" height="7" rx="1.5" fill="rgba(255,255,255,0.28)"/>
+                <circle cx="12" cy="13" r="4.5" fill="white"/>
+                <circle cx="12" cy="13" r="2.4" fill="#1B2B1E"/>
+                <circle cx="13" cy="12" r="0.9" fill="white"/>
+                <circle cx="24" cy="13" r="4.5" fill="white"/>
+                <circle cx="24" cy="13" r="2.4" fill="#1B2B1E"/>
+                <circle cx="25" cy="12" r="0.9" fill="white"/>
+                <path d="M10 23 Q18 29 26 23" stroke="rgba(255,255,255,0.82)" strokeWidth="1.8" strokeLinecap="round" fill="none"/>
+              </svg>
             </div>
             <div style={{ flex: 1 }}>
               <p style={{ margin: 0, fontWeight: 700, color: '#fff', fontSize: 15 }}>Menucito</p>
