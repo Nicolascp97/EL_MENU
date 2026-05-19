@@ -5,12 +5,9 @@ import { useRouter } from 'next/navigation'
 import UserMenu from '@/components/auth/UserMenu'
 import { createClient } from '@/lib/supabase/client'
 import type { UserRole, Product, Recipe } from '@/types/database'
-import dynamic from 'next/dynamic'
 import { useCart } from '@/hooks/useCart'
 import { useChatStore } from '@/hooks/useChatStore'
 import RecipesSection from './RecipesSection'
-
-const ZonesMap = dynamic(() => import('@/components/ZonesMap'), { ssr: false })
 
 const COMMUNES_WITH_DELIVERY = [
   'Cerrillos','El Bosque','Estación Central',
@@ -452,7 +449,7 @@ const IcoX = ({ size = 18 }: { size?: number }) => <svg width={size} height={siz
 const HOW_STEPS = [
   { cls: 'q', emoji: '🛒', num: '01', title: 'Elige tu pedido', desc: 'Elige tus productos en la web o pídele ayuda a Menucito, nuestro asistente.' },
   { cls: 's', emoji: '💳', num: '02', title: 'Paga en segundos', desc: 'Webpay Plus de Transbank. Confirmación instantánea, sin esperas ni sorpresas.' },
-  { cls: 'l', emoji: '🚚', num: '03', title: 'Despachamos ese día', desc: 'Pedidos antes de las 16:00 salen ese mismo día a las 21 comunas que cubrimos.' },
+  { cls: 'l', emoji: '🚚', num: '03', title: 'Despachamos al día siguiente', desc: 'Pide hoy, recibes mañana. Puntual a las 21 comunas que cubrimos.' },
   { cls: 'c', emoji: '🌿', num: '04', title: 'Recibes fresco', desc: 'Garantía de frescura. Si algo no llega en punto, lo cambiamos o te devolvemos el dinero.' },
 ]
 
@@ -469,7 +466,7 @@ const MENU_ITEMS: { icon: React.ReactNode; label: string; href: string; isExtern
 
 const FAQS = [
   { q: '¿A qué comunas despachan?', a: 'Despachamos a comunas seleccionadas de la Región Metropolitana de Santiago. El despacho tiene un costo único de $2.990 y el pedido mínimo es $20.000. Revisa la sección de Zonas de despacho para ver si tu comuna está incluida.' },
-  { q: '¿Cuánto tarda mi pedido en llegar?', a: 'Los pedidos confirmados antes de las 16:00 llegan ese mismo día. Después de las 16:00 entregamos al día siguiente. También puedes programar la fecha que prefieras al hacer checkout.' },
+  { q: '¿Cuánto tarda mi pedido en llegar?', a: 'Pide hoy y recibes mañana. También puedes programar la fecha que más te acomode al hacer el checkout.' },
   { q: '¿Cómo accedo a precios mayoristas?', a: 'Si tienes restaurante, almacén, verdulería u otro negocio, regístrate en <a href="/mayorista/registro">/mayorista/registro</a> con tu RUT comercial. Validamos y activamos tu cuenta en menos de 24 horas hábiles.' },
   { q: '¿Qué pasa si un producto no llega fresco?', a: 'Tenemos garantía de frescura: si algo no cumple, lo cambiamos o devolvemos el dinero. Escríbenos por <a href="https://wa.me/56954952395">WhatsApp</a> con foto y lo resolvemos de inmediato.' },
   { q: '¿Qué medios de pago aceptan?', a: 'Aceptamos Webpay Plus de Transbank (débito, crédito y prepago). Es el único medio de pago disponible por ahora.' },
@@ -730,8 +727,8 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
         <div className="container">
           <div className="trust-strip">
             {[
-              { icon: <IcoTruck />, title: 'Despacho mismo día', desc: 'Pedidos antes de las 16:00 llegan hoy en toda la RM.' },
-              { icon: <IcoLeaf />, title: 'Cosechado <48h', desc: 'Compramos cada mañana en Lo Valledor. Si no es fresco, no lo vendemos.' },
+              { icon: <IcoTruck />, title: 'Pide hoy, recibes mañana', desc: 'Despachamos a las 21 comunas que cubrimos. También puedes programar la fecha.' },
+              { icon: <IcoLeaf />, title: 'Cosechado <48h', desc: 'Seleccionamos el mejor producto de temporada cada madrugada. Si no es fresco, no lo vendemos.' },
               { icon: <IcoShield />, title: 'Garantía de frescura', desc: 'Si algún producto no cumple, lo cambiamos o devolvemos la plata.' },
               { icon: <IcoCard />, title: 'Pago seguro', desc: 'Webpay Plus de Transbank. Débito, crédito y prepago.' },
             ].map(v => (
@@ -803,32 +800,38 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
               <span className="section-eye"><IcoTruck size={14} /> Cobertura</span>
               <h2>¿Llegamos a tu comuna?</h2>
               <p style={{ color: 'var(--gray-500)', fontSize: 14, marginTop: 8 }}>
-                Cubrimos 21 comunas de Santiago. Haz clic en cualquiera para verla en el mapa.
+                21 comunas de Santiago con despacho a domicilio.
               </p>
             </div>
           </div>
-          <div className="zones-frame">
-            <ZonesMap />
+
+          {/* Info bar */}
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 24, padding: '12px 20px', background: 'var(--green-50)', borderRadius: 'var(--radius-md)', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
+              <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 600 }}>21 comunas cubiertas</span>
+            </div>
+            <span style={{ fontSize: 13, color: 'var(--gray-500)' }}>Despacho <strong style={{ color: 'var(--ink)' }}>$2.990</strong></span>
+            <span style={{ fontSize: 13, color: 'var(--gray-500)' }}>Mínimo <strong style={{ color: 'var(--ink)' }}>$20.000</strong></span>
           </div>
-          <div className="zones-legend">
-            <div className="zl-item">
-              <span className="zl-dot" style={{ background: '#22C55E' }} />
-              Con despacho
-            </div>
-            <div className="zl-item">
-              <span className="zl-dot" style={{ background: '#94A3B8' }} />
-              Sin cobertura aún
-            </div>
-            <div className="zl-sep" />
-            <div className="zl-price">
-              Despacho <strong>$2.990</strong> · Mínimo $20.000
-            </div>
-          </div>
-          <div className="zones-commune-grid">
-            {COMMUNES_WITH_DELIVERY.map(c => (
-              <div key={c} className="zc-item">
-                <span className="zl-dot" style={{ background: '#22C55E' }} />
-                {c}
+
+          {/* Sectores geográficos */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+            {([
+              { sector: 'Oriente', communes: ['Providencia', 'Ñuñoa', 'Macul', 'La Reina', 'Las Condes', 'Vitacura', 'Lo Barnechea'] },
+              { sector: 'Sur',     communes: ['La Florida', 'Peñalolén', 'Puente Alto', 'La Granja', 'La Cisterna', 'El Bosque', 'San Miguel', 'San Joaquín', 'San Ramón', 'Pedro Aguirre Cerda'] },
+              { sector: 'Centro & Poniente', communes: ['Santiago', 'Estación Central', 'Maipú', 'Cerrillos'] },
+            ] as const).map(({ sector, communes }) => (
+              <div key={sector} style={{ background: 'var(--surface)', borderRadius: 'var(--radius-md)', border: '1px solid var(--gray-100)', padding: '16px 20px' }}>
+                <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--green-700)', margin: '0 0 12px' }}>{sector}</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {communes.map(c => (
+                    <div key={c} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22C55E', flexShrink: 0 }} />
+                      <span style={{ fontSize: 13, color: 'var(--ink)' }}>{c}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -898,12 +901,12 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
           <div className="container" id="b2b">
             <div className="b2b">
               <div className="lead">
-                <span style={{ fontSize: 12, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--gold-700)' }}>Para restaurantes & minimarkets</span>
+                <span style={{ fontSize: 12, letterSpacing: '.14em', textTransform: 'uppercase', fontWeight: 700, color: 'var(--gold-700)' }}>Para los que cocinan todos los días</span>
                 <h2 style={{ marginTop: 12 }}>Mayorista con precios de feria<br />y servicio de oficina.</h2>
-                <p>Somos el eslabón entre Lo Valledor y tu cocina. Compramos en volumen cada madrugada, entregamos antes de las 7 AM con factura electrónica al instante.</p>
+                <p>Seleccionamos el mejor producto de temporada cada madrugada y lo dejamos en tu cocina antes de que abras. Con factura electrónica al instante.</p>
                 <div className="b2b-stats">
                   <div className="stat"><div className="n num">127+</div><div className="l">Restaurantes activos</div></div>
-                  <div className="stat"><div className="n num">30 días</div><div className="l">Crédito disponible</div></div>
+                  <div className="stat"><div className="n num">24h</div><div className="l">Activación de cuenta</div></div>
                   <div className="stat"><div className="n num">&lt; 7 AM</div><div className="l">Entrega garantizada</div></div>
                 </div>
               </div>
