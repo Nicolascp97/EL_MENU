@@ -16,7 +16,9 @@ export default function LoginMayoristaPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const target = params.get('next')
-    if (target) setNext(target)
+    if (target && target.startsWith('/') && !target.startsWith('//')) {
+      setNext(target)
+    }
   }, [])
 
   async function onSubmit(e: FormEvent) {

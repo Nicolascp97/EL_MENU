@@ -95,7 +95,37 @@ const tools: Anthropic.Messages.Tool[] = [
 
 type ApiMessage = { role: 'user' | 'assistant'; content: string }
 
+// Rate limiting simple en memoria (por proceso)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
+const RATE_LIMIT = 20
+const RATE_WINDOW = 60_000
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const entry = rateLimitMap.get(ip)
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW })
+    return true
+  }
+  if (entry.count >= RATE_LIMIT) return false
+  entry.count++
+  return true
+}
+
+function sanitizeCartSummary(raw: string): string {
+  return raw
+    .slice(0, 500)
+    .replace(/[\r\n]+/g, ', ')
+    .replace(/[<>{}[\]]/g, '')
+    .trim()
+}
+
 export async function POST(req: NextRequest) {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({ error: 'Demasiadas consultas. Intenta en un minuto.' }, { status: 429 })
+  }
+
   let body: { messages: ApiMessage[]; cartSummary?: string }
   try {
     body = await req.json()
@@ -103,13 +133,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'JSON inválido' }, { status: 400 })
   }
 
-  if (!body.messages?.length) {
+  const MAX_MESSAGES = 30
+  const MAX_MSG_LEN = 2000
+  const MAX_CART = 500
+  const VALID_ROLES = new Set(['user', 'assistant'])
+
+  if (!Array.isArray(body.messages) || body.messages.length === 0) {
     return NextResponse.json({ error: 'Sin mensajes' }, { status: 400 })
+  }
+  if (body.messages.length > MAX_MESSAGES) {
+    return NextResponse.json({ error: 'Historial muy largo' }, { status: 400 })
+  }
+  if (body.messages.some(m => !VALID_ROLES.has(m.role) || typeof m.content !== 'string' || m.content.length > MAX_MSG_LEN)) {
+    return NextResponse.json({ error: 'Mensaje inválido' }, { status: 400 })
+  }
+  if (body.cartSummary && body.cartSummary.length > MAX_CART) {
+    body.cartSummary = body.cartSummary.slice(0, MAX_CART)
   }
 
   const admin = createAdminClient()
   const cartCtx = body.cartSummary
-    ? `\n\nCARRITO ACTUAL DEL CLIENTE: ${body.cartSummary}`
+    ? `\n\n[CARRITO DEL CLIENTE (solo lectura)]: ${sanitizeCartSummary(body.cartSummary)}`
     : ''
 
   let currentMsgs: Anthropic.Messages.MessageParam[] = body.messages.map(m => ({
@@ -117,10 +161,10 @@ export async function POST(req: NextRequest) {
     content: m.content,
   }))
 
-  // Tracked across tool loops
   const shownProducts: Product[] = []
   const pendingCartItems: { product_id: string; qty: number }[] = []
 
+  try {
   for (let i = 0; i < 5; i++) {
     const resp = await client.messages.create({
       model: 'claude-sonnet-4-6',
@@ -136,7 +180,6 @@ export async function POST(req: NextRequest) {
         .map(c => c.text)
         .join('')
 
-      // Fetch full product objects for cart additions
       let addedToCart: { product: Product; qty: number }[] = []
       if (pendingCartItems.length > 0) {
         const ids = pendingCartItems.map(i => i.product_id)
@@ -176,23 +219,27 @@ export async function POST(req: NextRequest) {
       if (tu.name === 'buscar_productos') {
         const rawQuery = (tu.input as { query: string }).query.trim()
 
-        // Build search candidates: original + plural-stripped fallback
         const stripped = rawQuery
-          .replace(/ones$/i, 'on')   // limones → limon
-          .replace(/nes$/i, 'n')     // melones → melon
-          .replace(/les$/i, 'l')     // toronjes → toronj (edge case)
-          .replace(/es$/i, '')       // tomates → tomat
-          .replace(/s$/i, '')        // paltas → palta
+          .replace(/ones$/i, 'on')
+          .replace(/nes$/i, 'n')
+          .replace(/les$/i, 'l')
+          .replace(/es$/i, '')
+          .replace(/s$/i, '')
         const candidates = [...new Set([rawQuery, stripped])].filter(q => q.length >= 2)
 
         let found: Product[] = []
         for (const q of candidates) {
+          const safeLikeQuery = q
+            .replace(/%/g, '\\%')
+            .replace(/_/g, '\\_')
+            .slice(0, 100)
+
           const { data } = await admin
             .from('products')
             .select('*, category:categories(id, name, slug, order, emoji)')
             .eq('active', true)
             .eq('wholesale_only', false)
-            .ilike('name', `%${q}%`)
+            .ilike('name', `%${safeLikeQuery}%`)
             .gt('stock', 0)
             .order('name')
             .limit(6)
@@ -204,7 +251,6 @@ export async function POST(req: NextRequest) {
           if (!shownProducts.find(s => s.id === p.id)) shownProducts.push(p)
         })
 
-        // Return simplified data to Claude (saves tokens)
         result = found.map(p => ({
           id: p.id,
           name: p.name,
@@ -240,6 +286,12 @@ export async function POST(req: NextRequest) {
     }
 
     currentMsgs = [...currentMsgs, { role: 'user', content: toolResults }]
+  }
+  } catch (err) {
+    console.error('[chat] Error en llamada a Anthropic:', JSON.stringify(err, null, 2))
+    return NextResponse.json({
+      message: 'Tuve un problema al procesar tu consulta. Por favor intenta de nuevo.',
+    })
   }
 
   return NextResponse.json({

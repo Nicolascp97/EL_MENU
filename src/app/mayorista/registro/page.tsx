@@ -33,7 +33,8 @@ export default function RegistroMayoristaPage() {
         data: {
           name: form.name,
           phone: form.phone,
-          role: 'mayorista',
+          role: 'minorista',
+          mayorista_requested: true,
         },
       },
     })
@@ -61,7 +62,7 @@ export default function RegistroMayoristaPage() {
           </h1>
           <p className="text-gray-600 mb-6">
             Te enviamos un mail a <strong>{form.email}</strong> para confirmar tu cuenta. Una vez
-            confirmado, vas a poder ingresar al canal mayorista.
+            confirmado, el equipo de El Menú revisará tu solicitud y activará tu acceso mayorista en 24-48 horas.
           </p>
           <Link
             href="/mayorista/login"

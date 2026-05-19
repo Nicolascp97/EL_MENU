@@ -42,13 +42,23 @@ async function notifyWhatsApp(order: OrderRow) {
   ].join('\n')
 
   const url = `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodeURIComponent(msg)}&apikey=${apiKey}`
-  await fetch(url).catch(() => {})
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), 5000)
+  try {
+    await fetch(url, { signal: controller.signal })
+  } catch {
+    // Ignorar errores de notificación (no críticos)
+  } finally {
+    clearTimeout(id)
+  }
 }
 
 async function handleReturn(req: Request): Promise<Response> {
-  const url = new URL(req.url)
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL || `${url.protocol}//${url.host}`
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (!appUrl) {
+    console.error('NEXT_PUBLIC_APP_URL no está configurado')
+    return NextResponse.json({ error: 'Configuración del servidor incompleta.' }, { status: 500 })
+  }
 
   let tokenWs: string | null = null
   let tbkToken: string | null = null
@@ -58,13 +68,13 @@ async function handleReturn(req: Request): Promise<Response> {
     tokenWs = (form.get('token_ws') as string) ?? null
     tbkToken = (form.get('TBK_TOKEN') as string) ?? null
   } else {
+    const url = new URL(req.url)
     tokenWs = url.searchParams.get('token_ws')
     tbkToken = url.searchParams.get('TBK_TOKEN')
   }
 
   const admin = createAdminClient()
 
-  // Usuario canceló desde la pantalla de Transbank.
   if (tbkToken && !tokenWs) {
     const { data: order } = await admin
       .from('orders')
@@ -83,12 +93,42 @@ async function handleReturn(req: Request): Promise<Response> {
   }
 
   try {
+    // 1. Verificar idempotencia: solo procesar si aún está pendiente
+    const { data: existingOrder } = await admin
+      .from('orders')
+      .select('id, payment_status, total, phone, commune, address, items')
+      .eq('transbank_token', tokenWs)
+      .maybeSingle()
+
+    if (!existingOrder) {
+      return NextResponse.redirect(`${appUrl}/checkout/confirmacion?status=error`, { status: 303 })
+    }
+
+    if (existingOrder.payment_status !== 'pendiente') {
+      const status = existingOrder.payment_status === 'pagado' ? 'success' : 'failed'
+      return NextResponse.redirect(
+        `${appUrl}/checkout/confirmacion?status=${status}&orderId=${existingOrder.id}`,
+        { status: 303 }
+      )
+    }
+
     const tx = createWebpayPlus()
     const result = await tx.commit(tokenWs)
 
     const authorized =
       result?.response_code === 0 && String(result?.status).toUpperCase() === 'AUTHORIZED'
 
+    // 2. Verificar que el monto coincida
+    if (authorized && result.amount !== existingOrder.total) {
+      console.error(`[Transbank] Monto no coincide: esperado ${existingOrder.total}, recibido ${result.amount}. Order: ${existingOrder.id}`)
+      await admin.from('orders')
+        .update({ payment_status: 'fallido', status: 'cancelado' })
+        .eq('id', existingOrder.id)
+        .eq('payment_status', 'pendiente')
+      return NextResponse.redirect(`${appUrl}/checkout/confirmacion?status=error`, { status: 303 })
+    }
+
+    // 3. Actualizar solo si sigue pendiente (guard idempotencia)
     const { data: order } = await admin
       .from('orders')
       .update({
@@ -96,28 +136,26 @@ async function handleReturn(req: Request): Promise<Response> {
         status: authorized ? 'nuevo' : 'cancelado',
       })
       .eq('transbank_token', tokenWs)
+      .eq('payment_status', 'pendiente')
       .select('id, total, phone, commune, address, items')
       .maybeSingle()
 
-    // Notificar al local por WhatsApp cuando el pago es exitoso
     if (authorized && order) {
       notifyWhatsApp(order as OrderRow).catch(() => {})
     }
 
     return NextResponse.redirect(
       `${appUrl}/checkout/confirmacion?status=${authorized ? 'success' : 'failed'}${
-        order ? `&orderId=${order.id}` : ''
+        order ? `&orderId=${order.id}` : `&orderId=${existingOrder.id}`
       }`,
       { status: 303 }
     )
-  } catch {
-    await admin
-      .from('orders')
-      .update({ payment_status: 'fallido', status: 'cancelado' })
-      .eq('transbank_token', tokenWs)
+  } catch (err) {
+    // En catch: NO cancelar automáticamente — puede que el pago sí se haya procesado
+    console.error('[Transbank] Error en commit:', err)
     return NextResponse.redirect(`${appUrl}/checkout/confirmacion?status=error`, { status: 303 })
   }
 }
 
 export const POST = handleReturn
-export const GET = handleReturn
+// GET eliminado: Transbank usa solo POST para el callback

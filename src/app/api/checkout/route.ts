@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buyOrderFromUuid, createWebpayPlus } from '@/lib/transbank'
+import { checkOrigin } from '@/lib/csrf'
 import type { UserRole, OrderItem } from '@/types/database'
 
 type Body = {
@@ -12,7 +13,19 @@ type Body = {
   notes?: string
 }
 
-export async function POST(req: Request) {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const MAX_ITEMS = 50
+
+export async function POST(req: NextRequest) {
+  const csrfError = checkOrigin(req)
+  if (csrfError) return csrfError
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (!appUrl) {
+    console.error('NEXT_PUBLIC_APP_URL no está configurado')
+    return NextResponse.json({ error: 'Configuración del servidor incompleta.' }, { status: 500 })
+  }
+
   let body: Body
   try {
     body = (await req.json()) as Body
@@ -27,7 +40,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Completá dirección, comuna y teléfono.' }, { status: 400 })
   }
 
-  // Identificar al usuario (puede ser invitado)
+  if (body.items.length > MAX_ITEMS) {
+    return NextResponse.json({ error: 'Demasiados productos en el carrito.' }, { status: 400 })
+  }
+  if (body.items.some(i => !UUID_RE.test(i.product_id))) {
+    return NextResponse.json({ error: 'Producto inválido.' }, { status: 400 })
+  }
+  if (body.address.trim().length > 200) {
+    return NextResponse.json({ error: 'Dirección demasiado larga.' }, { status: 400 })
+  }
+  if (body.phone.trim().length > 20) {
+    return NextResponse.json({ error: 'Teléfono inválido.' }, { status: 400 })
+  }
+  if (body.notes && body.notes.length > 500) {
+    return NextResponse.json({ error: 'Las notas no pueden superar 500 caracteres.' }, { status: 400 })
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -42,7 +70,6 @@ export async function POST(req: Request) {
   }
   const useWholesale = role === 'mayorista' || role === 'admin'
 
-  // Service role para no depender de RLS al leer products/zones.
   const admin = createAdminClient()
 
   const productIds = body.items.map(i => i.product_id)
@@ -63,7 +90,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: `No despachamos a ${body.commune} todavía.` }, { status: 400 })
   }
 
-  // Recalcular precios del servidor (no confiar en el cliente).
   const orderItems: OrderItem[] = []
   let subtotal = 0
   for (const it of body.items) {
@@ -107,7 +133,6 @@ export async function POST(req: Request) {
 
   const total = subtotal + zone.delivery_price
 
-  // Crear order con payment_status = 'pendiente'
   const { data: order, error: oErr } = await admin
     .from('orders')
     .insert({
@@ -128,32 +153,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'No pude crear el pedido.' }, { status: 500 })
   }
 
-  // Iniciar transacción Transbank
   const buyOrder = buyOrderFromUuid(order.id)
   const sessionId = `s${Date.now()}`.slice(0, 61)
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL || `http://${req.headers.get('host') ?? 'localhost:3000'}`
   const returnUrl = `${appUrl}/api/transbank/return`
 
   try {
     const tx = createWebpayPlus()
     const tbk = await tx.create(buyOrder, sessionId, total, returnUrl)
 
-    // Guardar token para matchear cuando vuelva el callback.
     await admin.from('orders').update({ transbank_token: tbk.token }).eq('id', order.id)
 
     return NextResponse.json({
       orderId: order.id,
       url: tbk.url,
-      token: tbk.token,
+      // token eliminado: el cliente solo necesita la URL de redirect
     })
   } catch (e) {
-    // Rollback lógico: marcamos el pedido como cancelado.
     await admin
       .from('orders')
       .update({ status: 'cancelado', payment_status: 'fallido' })
       .eq('id', order.id)
-    const msg = e instanceof Error ? e.message : 'Error iniciando pago.'
-    return NextResponse.json({ error: msg }, { status: 500 })
+    console.error('[Transbank] Error al iniciar transacción:', e)
+    return NextResponse.json({ error: 'Error al iniciar el pago. Por favor intenta nuevamente.' }, { status: 500 })
   }
 }

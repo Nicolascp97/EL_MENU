@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { checkOrigin } from '@/lib/csrf'
 import type { UserRole, OrderItem } from '@/types/database'
 
 type Body = {
@@ -19,6 +20,21 @@ type OrderRow = {
   commune: string
   address: string
   items: { product_name: string; qty: number; unit: string }[]
+}
+
+// Rate limiting: máx 3 órdenes transfer/hora/IP
+const transferRateMap = new Map<string, { count: number; resetAt: number }>()
+
+function checkTransferRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const entry = transferRateMap.get(ip)
+  if (!entry || now > entry.resetAt) {
+    transferRateMap.set(ip, { count: 1, resetAt: now + 3_600_000 })
+    return true
+  }
+  if (entry.count >= 3) return false
+  entry.count++
+  return true
 }
 
 async function notifyWhatsApp(order: OrderRow) {
@@ -44,10 +60,31 @@ async function notifyWhatsApp(order: OrderRow) {
   ].join('\n')
 
   const url = `https://api.callmebot.com/whatsapp.php?phone=${waNumber}&text=${encodeURIComponent(msg)}&apikey=${apiKey}`
-  await fetch(url).catch(() => {})
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), 5000)
+  try {
+    await fetch(url, { signal: controller.signal })
+  } catch {
+    // Ignorar errores de notificación (no críticos)
+  } finally {
+    clearTimeout(id)
+  }
 }
 
-export async function POST(req: Request) {
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const MAX_ITEMS = 50
+
+export async function POST(req: NextRequest) {
+  const csrfError = checkOrigin(req)
+  if (csrfError) return csrfError
+
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  if (!checkTransferRateLimit(ip)) {
+    return NextResponse.json({
+      error: 'Has realizado demasiadas solicitudes de transferencia. Intenta más tarde o contáctanos por WhatsApp.',
+    }, { status: 429 })
+  }
+
   let body: Body
   try {
     body = (await req.json()) as Body
@@ -60,6 +97,22 @@ export async function POST(req: Request) {
   }
   if (!body.address?.trim() || !body.commune?.trim() || !body.phone?.trim()) {
     return NextResponse.json({ error: 'Completá dirección, comuna y teléfono.' }, { status: 400 })
+  }
+
+  if (body.items.length > MAX_ITEMS) {
+    return NextResponse.json({ error: 'Demasiados productos en el carrito.' }, { status: 400 })
+  }
+  if (body.items.some(i => !UUID_RE.test(i.product_id))) {
+    return NextResponse.json({ error: 'Producto inválido.' }, { status: 400 })
+  }
+  if (body.address.trim().length > 200) {
+    return NextResponse.json({ error: 'Dirección demasiado larga.' }, { status: 400 })
+  }
+  if (body.phone.trim().length > 20) {
+    return NextResponse.json({ error: 'Teléfono inválido.' }, { status: 400 })
+  }
+  if (body.notes && body.notes.length > 500) {
+    return NextResponse.json({ error: 'Las notas no pueden superar 500 caracteres.' }, { status: 400 })
   }
 
   const supabase = await createClient()
@@ -142,7 +195,7 @@ export async function POST(req: Request) {
     .insert({
       user_id: user?.id ?? null,
       channel: 'web',
-      status: 'nuevo',
+      status: 'pendiente_pago',
       items: orderItems,
       total,
       address: body.address.trim(),
