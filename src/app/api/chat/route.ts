@@ -290,7 +290,7 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     const msg = String((err as { message?: string }).message ?? err).slice(0, 400)
     console.error('[chat] Anthropic error:', msg)
-    return NextResponse.json({ message: 'Tuve un problema al procesar tu consulta. Por favor intenta de nuevo.', _dbg: msg })
+    return NextResponse.json({ message: 'Tuve un problema al procesar tu consulta. Por favor intenta de nuevo.' })
   }
 
   return NextResponse.json({
