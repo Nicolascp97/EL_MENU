@@ -31,12 +31,11 @@ const CONFIG: Record<Mode, {
   minorista: {
     tag: 'CATÁLOGO MINORISTA',
     title: 'Frutas y verduras frescas para tu casa.',
-    subtitle: 'Compramos cada mañana en Lo Valledor y te lo llevamos el mismo día. Pide desde cualquier comuna de la RM.',
+    subtitle: 'Como ir a la feria, pero sin salir de casa. Te llevamos frutas y verduras frescas directo a tu puerta.',
     rules: [
       { icon: <Truck size={14} />, text: 'Pedido mínimo $20.000' },
-      { icon: <Truck size={14} />, text: 'Despacho plano $2.500' },
+      { icon: <Truck size={14} />, text: 'Despacho único $2.500' },
       { icon: <ShieldCheck size={14} />, text: 'Garantía de frescura' },
-      { icon: <Clock size={14} />, text: 'Pide antes de las 16:00' },
     ],
     accent: '#1B2B1E',
     accentSoft: '#D8F3DC',
