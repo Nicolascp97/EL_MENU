@@ -18,7 +18,7 @@ export default function Navbar() {
       {/* Top bar */}
       <div
         className="text-white py-1.5 px-4 text-center"
-        style={{ backgroundColor: '#1B2B1E' }}
+        style={{ backgroundColor: '#E8621A' }}
       >
         <span
           style={{
@@ -28,7 +28,7 @@ export default function Navbar() {
             lineHeight: 1.3,
           }}
         >
-          Tenemos esa Oferta que Sorprende🤩
+          Tenemos esa Oferta que Sorprende
         </span>
       </div>
 

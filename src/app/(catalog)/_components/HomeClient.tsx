@@ -153,8 +153,8 @@ const CSS = `
   .product .price { font-family: 'Fraunces', serif; font-weight: 700; font-size: 20px; color: var(--green-900); }
   .product .price small { font-size: 13px; font-weight: 500; color: var(--gray-500); margin-left: 2px; }
   .product .price .old { display: block; font-size: 12px; color: var(--gray-500); text-decoration: line-through; font-weight: 500; }
-  .product .add-yellow { width: 100%; height: 40px; border-radius: 10px; background: var(--yellow); color: #422006; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all .15s ease; border: 0; cursor: pointer; }
-  .product .add-yellow:hover { background: var(--yellow-hover); transform: translateY(-1px); }
+  .product .add-yellow { width: 100%; height: 40px; border-radius: 10px; background: var(--orange); color: #fff; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all .15s ease; border: 0; cursor: pointer; }
+  .product .add-yellow:hover { background: var(--orange-dk); transform: translateY(-1px); }
   .product-foot.col { flex-direction: column; align-items: stretch; gap: 10px; }
 
   /* AI SECTION */
@@ -624,7 +624,7 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
       {/* TOP BAR */}
       <div className="topbar">
         <div className="inner">
-          <span className="tagline">Tenemos esa Oferta que Sorprende🤩</span>
+          <span className="tagline">Tenemos esa Oferta que Sorprende</span>
           <div className="links">
             <Link href="/mi-cuenta#pedidos">Seguir mi pedido</Link>
             <a href="https://wa.me/56954952395?text=Hola!%20Necesito%20ayuda" target="_blank" rel="noopener noreferrer">Ayuda</a>
