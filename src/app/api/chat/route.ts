@@ -287,11 +287,10 @@ export async function POST(req: NextRequest) {
 
     currentMsgs = [...currentMsgs, { role: 'user', content: toolResults }]
   }
-  } catch (err) {
-    console.error('[chat] Error en llamada a Anthropic:', JSON.stringify(err, null, 2))
-    return NextResponse.json({
-      message: 'Tuve un problema al procesar tu consulta. Por favor intenta de nuevo.',
-    })
+  } catch (err: unknown) {
+    const msg = String((err as { message?: string }).message ?? err).slice(0, 400)
+    console.error('[chat] Anthropic error:', msg)
+    return NextResponse.json({ message: 'Tuve un problema al procesar tu consulta. Por favor intenta de nuevo.', _dbg: msg })
   }
 
   return NextResponse.json({
