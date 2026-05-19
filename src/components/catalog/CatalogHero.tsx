@@ -34,7 +34,7 @@ const CONFIG: Record<Mode, {
     subtitle: 'Como ir a la feria, pero sin salir de casa. Te llevamos frutas y verduras frescas directo a tu puerta.',
     rules: [
       { icon: <Truck size={14} />, text: 'Pedido mínimo $20.000' },
-      { icon: <Truck size={14} />, text: 'Despacho único $2.500' },
+      { icon: <Truck size={14} />, text: 'Despacho único $2.990' },
       { icon: <ShieldCheck size={14} />, text: 'Garantía de frescura' },
     ],
     accent: '#1B2B1E',
