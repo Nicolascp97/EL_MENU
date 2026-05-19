@@ -5,7 +5,7 @@ import type { Product } from '@/types/database'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
-const SYSTEM = `Eres Meni, la asistente virtual de El Menú — verdulería online con despacho a domicilio en Santiago, Chile.
+const SYSTEM = `Eres Menucito, el asistente virtual de El Menú — verdulería online con despacho a domicilio en Santiago, Chile.
 
 Tu misión: ayudar a encontrar productos frescos, armar el pedido y guiar al checkout de forma rápida y amable.
 

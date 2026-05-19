@@ -13,11 +13,11 @@ import RecipesSection from './RecipesSection'
 const ZonesMap = dynamic(() => import('@/components/ZonesMap'), { ssr: false })
 
 const COMMUNES_WITH_DELIVERY = [
-  'Cerrillos','El Bosque','Estación Central','Huechuraba','Independencia',
+  'Cerrillos','El Bosque','Estación Central',
   'La Cisterna','La Florida','La Granja','La Reina','Las Condes',
   'Lo Barnechea','Macul','Maipú','Ñuñoa','Pedro Aguirre Cerda',
-  'Peñalolén','Providencia','Pudahuel','Puente Alto','Quilicura',
-  'Recoleta','Renca','San Joaquín','San Miguel','San Ramón',
+  'Peñalolén','Providencia','Puente Alto',
+  'San Joaquín','San Miguel','San Ramón',
   'Santiago','Vitacura',
 ].sort()
 
@@ -62,7 +62,7 @@ const CSS = `
   .num { font-variant-numeric: tabular-nums; }
 
   /* TOP BAR */
-  .topbar { background: var(--green-900); color: #fff; }
+  .topbar { background: var(--orange); color: #fff; }
   .topbar .inner { max-width: 1280px; margin: 0 auto; padding: 8px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .topbar .tagline { font-family: var(--font-dancing), cursive; font-size: 1.25rem; font-weight: 700; letter-spacing: 0.01em; line-height: 1.3; }
   .topbar .links { display: flex; gap: 24px; color: rgba(255,255,255,.75); font-size: 12px; font-weight: 500; letter-spacing: .02em; }
@@ -110,6 +110,7 @@ const CSS = `
   .hero-circle .circle-label { font-size: 18px; font-weight: 700; text-align: center; line-height: 1.2; }
   .hero-circle.retail { background: var(--green-900); color: #fff; }
   .hero-circle.wholesale { background: var(--orange); color: #fff; }
+  .hero-circle .circle-cta { font-size: 12px; font-weight: 600; opacity: 0.72; letter-spacing: .04em; display: flex; align-items: center; gap: 4px; margin-top: 2px; }
 
   /* SEARCH STRIP under hero */
   .hero-search-strip { margin-top: 28px; display: flex; gap: 10px; background: #fff; padding: 8px; border-radius: 100px; box-shadow: var(--shadow-md); max-width: 720px; margin-left: auto; margin-right: auto; }
@@ -446,7 +447,7 @@ const IcoX = ({ size = 18 }: { size?: number }) => <svg width={size} height={siz
 
 /* ── DATA ─────────────────────────────────────────── */
 const HOW_STEPS = [
-  { cls: 'q', emoji: '🛒', num: '01', title: 'Elige tu pedido', desc: 'En la web o por WhatsApp. Con Meni, nuestro asistente IA, o armándolo tú mismo.' },
+  { cls: 'q', emoji: '🛒', num: '01', title: 'Elige tu pedido', desc: 'Elige tus productos en la web o pídele ayuda a Menucito, nuestro asistente.' },
   { cls: 's', emoji: '💳', num: '02', title: 'Paga en segundos', desc: 'Webpay Plus de Transbank. Confirmación instantánea, sin esperas ni sorpresas.' },
   { cls: 'l', emoji: '🚚', num: '03', title: 'Despachamos ese día', desc: 'Pedidos antes de las 16:00 salen ese mismo día a las 21 comunas que cubrimos.' },
   { cls: 'c', emoji: '🌿', num: '04', title: 'Recibes fresco', desc: 'Garantía de frescura. Si algo no llega en punto, lo cambiamos o te devolvemos el dinero.' },
@@ -456,7 +457,7 @@ const MENU_ITEMS: { icon: React.ReactNode; label: string; href: string; isExtern
   { icon: '🥬', label: 'Catálogo minorista', href: '/catalogo' },
   { icon: '🏪', label: 'Catálogo mayorista', href: '/mayorista', tag: 'Empresas' },
   { icon: '🏢', label: 'Registra tu negocio', href: '/mayorista/registro' },
-  { icon: '🤖', label: 'Asistente IA · Meni', href: 'https://wa.me/56954952395?text=Hola%20Meni!%20Necesito%20armar%20un%20pedido', isExternal: true, tag: 'Nuevo' },
+  { icon: '🤖', label: 'Asistente IA · Menucito', href: 'https://wa.me/56954952395?text=Hola%20Menucito!%20Necesito%20armar%20un%20pedido', isExternal: true, tag: 'Nuevo' },
   { icon: '📦', label: 'Seguir mi pedido', href: '/mi-cuenta#pedidos' },
   { icon: '🚚', label: 'Zonas de despacho', href: '#zonas' },
   { icon: '❓', label: 'Preguntas frecuentes', href: '#faq' },
@@ -535,7 +536,7 @@ function OpenChatButton() {
       className="btn-primary"
       style={{ background: 'var(--warm)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
     >
-      <IcoBot size={18} /> Hablar con Meni
+      <IcoBot size={18} /> Hablar con Menucito
     </button>
   )
 }
@@ -704,10 +705,12 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
             <Link href="/catalogo" className="hero-circle retail" aria-label="Para mi casa – ver catálogo minorista">
               <div className="circle-icon"><IcoHouse size={44} /></div>
               <span className="circle-label">Para mi casa</span>
+              <span className="circle-cta">Ver catálogo <IcoArrow size={12} /></span>
             </Link>
             <Link href="/mayorista" className="hero-circle wholesale" aria-label="Para mi negocio – ver catálogo mayorista">
               <div className="circle-icon"><IcoStore size={44} /></div>
               <span className="circle-label">Para mi negocio</span>
+              <span className="circle-cta">Ver catálogo <IcoArrow size={12} /></span>
             </Link>
           </div>
 
@@ -814,23 +817,18 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
               Sin cobertura aún
             </div>
             <div className="zl-sep" />
-            <button className="zones-toggle" onClick={() => setZonesOpen(v => !v)}>
-              Ver las 21 comunas {zonesOpen ? '▲' : '▼'}
-            </button>
             <div className="zl-price">
               Despacho <strong>$2.990</strong> · Mínimo $20.000
             </div>
           </div>
-          {zonesOpen && (
-            <div className="zones-commune-grid">
-              {COMMUNES_WITH_DELIVERY.map(c => (
-                <div key={c} className="zc-item">
-                  <span className="zl-dot" style={{ background: '#22C55E' }} />
-                  {c}
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="zones-commune-grid">
+            {COMMUNES_WITH_DELIVERY.map(c => (
+              <div key={c} className="zc-item">
+                <span className="zl-dot" style={{ background: '#22C55E' }} />
+                {c}
+              </div>
+            ))}
+          </div>
         </div>
       </FadeUp>
 
@@ -844,14 +842,14 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
                   <span style={{ width: 6, height: 6, background: 'var(--warm)', borderRadius: '50%', display: 'inline-block' }} />
                   Nuevo · Solo en El Menú
                 </span>
-                <h2>Pide tu verdura hablando, no <em>tipeando</em>.</h2>
-                <p className="ai-desc">Nuestro asistente IA conoce el stock en tiempo real, tus compras anteriores y las recetas de la semana.</p>
+                <h2>Cuéntale a <em>Menucito</em> lo que necesitas.</h2>
+                <p className="ai-desc">Menucito es el ayudante de El Menú. Le escribes lo que quieres y él te arma el pedido, así de simple.</p>
                 <div className="ai-features">
                   {[
-                    '"Hazme una caja para ensaladas de la semana" — listo.',
-                    'Sugiere sustitutos cuando hay stock limitado.',
-                    'Pide desde la web sin crear cuenta, en segundos.',
-                    'Conoce el stock en tiempo real y te guía al checkout.',
+                    'Escríbele lo que necesitas: "quiero verduras para la semana".',
+                    'Te muestra lo que hay disponible y lo agrega a tu carrito.',
+                    'No necesitas registrarte ni crear cuenta.',
+                    'Está disponible todo el día, responde al instante.',
                   ].map(f => (
                     <div key={f} className="ai-feat">
                       <span className="chk"><IcoCheck /></span> {f}
@@ -866,11 +864,11 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
                 <div className="chat-head">
                   <div className="chat-avatar"><IcoBot size={20} /></div>
                   <div className="info">
-                    <div className="n">Menú · Asistente IA</div>
-                    <div className="s">● En línea · Responde en 2 segundos</div>
+                    <div className="n">Menucito</div>
+                    <div className="s">● En línea · Responde al instante</div>
                   </div>
                 </div>
-                <div className="msg bot">¡Hola! Soy el asistente de El Menú. ¿En qué te ayudo hoy?</div>
+                <div className="msg bot">¡Hola! Soy Menucito 🌿 Escríbeme lo que necesitas y te ayudo a armar tu pedido.</div>
                 <div className="msg user">Necesito verduras para una ensalada para 4 personas</div>
                 <div className="msg bot">
                   Perfecto. Te armé esta selección con productos frescos de hoy:

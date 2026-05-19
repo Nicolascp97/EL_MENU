@@ -198,7 +198,7 @@ export default function ChatWidget() {
       setMessages([{
         id: 'welcome',
         role: 'assistant',
-        text: '¡Hola! Soy Meni 🌿\n¿Qué productos buscas hoy? Te ayudo a armar tu pedido.',
+        text: '¡Hola! Soy Menucito 🌿\n¿Qué necesitas hoy? Te ayudo a armar tu pedido.',
       }])
     }
   }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -302,7 +302,7 @@ export default function ChatWidget() {
         <button
           className="chat-fab"
           onClick={() => openChat()}
-          aria-label="Abrir chat con Meni"
+          aria-label="Abrir chat con Menucito"
           style={{
             position: 'fixed', bottom: 24, right: 24, zIndex: 1000,
             width: 60, height: 60, borderRadius: '50%',
@@ -352,7 +352,7 @@ export default function ChatWidget() {
               🥦
             </div>
             <div style={{ flex: 1 }}>
-              <p style={{ margin: 0, fontWeight: 700, color: '#fff', fontSize: 15 }}>Meni</p>
+              <p style={{ margin: 0, fontWeight: 700, color: '#fff', fontSize: 15 }}>Menucito</p>
               <p style={{ margin: 0, fontSize: 11, color: '#9DC4AA' }}>Asistente de El Menú</p>
             </div>
             <button

@@ -113,7 +113,7 @@ export default function ProductCard({
               type="button"
               onClick={handleAdd}
               className="flex items-center justify-center w-10 h-10 rounded-full text-white transition-transform hover:scale-105 active:scale-95 shrink-0"
-              style={{ backgroundColor: added ? '#52B788' : accent }}
+              style={{ backgroundColor: added ? '#52B788' : '#E8621A' }}
               aria-label={`Agregar ${product.name} al carrito`}
             >
               {added ? <Check size={16} /> : <Plus size={18} />}
