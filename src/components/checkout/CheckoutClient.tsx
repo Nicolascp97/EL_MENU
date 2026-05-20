@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { CreditCard, Lock, ShieldCheck, Banknote, MessageCircle } from 'lucide-react'
+import { CreditCard, Lock, ShieldCheck, Banknote, MessageCircle, Home, Store } from 'lucide-react'
 import { useCart } from '@/hooks/useCart'
 import { formatPrice } from '@/lib/utils'
 import OrderSummary from './OrderSummary'
@@ -15,6 +15,8 @@ type Props = {
   initialName: string | null
   initialPhone: string | null
   initialAddress: string | null
+  initialDelivery?: 'domicilio' | 'tienda'
+  initialPayment?: 'webpay' | 'transfer'
 }
 
 const ORANGE = '#E8621A'
@@ -27,6 +29,8 @@ export default function CheckoutClient({
   initialName,
   initialPhone,
   initialAddress,
+  initialDelivery = 'domicilio',
+  initialPayment = 'webpay',
 }: Props) {
   const router = useRouter()
   const items = useCart(s => s.items)
@@ -46,17 +50,20 @@ export default function CheckoutClient({
   const [phone, setPhone]     = useState(initialPhone ?? '')
   const [address, setAddress] = useState(initialAddress ?? '')
   const [commune, setCommune] = useState(allCommunes[0] ?? '')
-  const [notes, setNotes]     = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState<string | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<'webpay' | 'transfer'>('webpay')
+  const [notes, setNotes]         = useState('')
+  const [loading, setLoading]     = useState(false)
+  const [error, setError]         = useState<string | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<'webpay' | 'transfer'>(initialPayment)
+  const [deliveryMethod, setDeliveryMethod] = useState<'domicilio' | 'tienda'>(initialDelivery)
 
   const selectedZone = useMemo(
     () => zones.find(z => z.communes.includes(commune)) ?? null,
     [zones, commune]
   )
 
-  const grandTotal = mounted ? total() + (selectedZone?.delivery_price ?? 0) : 0
+  const grandTotal = mounted
+    ? total() + (deliveryMethod === 'domicilio' ? (selectedZone?.delivery_price ?? 0) : 0)
+    : 0
 
   if (mounted && items.length === 0) {
     return (
@@ -81,14 +88,17 @@ export default function CheckoutClient({
     setLoading(true)
 
     try {
+      const finalAddress = deliveryMethod === 'tienda' ? 'Retiro en tienda' : address.trim()
+      const finalCommune = deliveryMethod === 'tienda' ? 'Retiro en tienda' : commune
+
       if (paymentMethod === 'transfer') {
         const res = await fetch('/api/checkout/transfer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             items: items.map(i => ({ product_id: i.product.id, qty: i.qty })),
-            address: address.trim(),
-            commune,
+            address: finalAddress,
+            commune: finalCommune,
             phone: phone.trim(),
             name: name.trim(),
             notes: notes.trim() || undefined,
@@ -107,8 +117,8 @@ export default function CheckoutClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           items: items.map(i => ({ product_id: i.product.id, qty: i.qty })),
-          address: address.trim(),
-          commune,
+          address: finalAddress,
+          commune: finalCommune,
           phone: phone.trim(),
           notes: notes.trim() || undefined,
         }),
@@ -139,6 +149,34 @@ export default function CheckoutClient({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
       <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-5">
+
+        {/* ── Tipo de entrega ── */}
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-gray-900">Tipo de entrega</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <DeliveryMethodCard
+              selected={deliveryMethod === 'domicilio'}
+              onClick={() => setDeliveryMethod('domicilio')}
+              icon={<Home size={20} />}
+              label="Despacho a domicilio"
+              sublabel="Desde $2.990 según comuna"
+            />
+            <DeliveryMethodCard
+              selected={deliveryMethod === 'tienda'}
+              onClick={() => setDeliveryMethod('tienda')}
+              icon={<Store size={20} />}
+              label="Retiro en tienda"
+              sublabel="Sin costo adicional"
+            />
+          </div>
+          {deliveryMethod === 'tienda' && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900 space-y-1">
+              <p className="font-semibold">Dirección de retiro</p>
+              <p className="text-emerald-700">Te enviaremos la dirección exacta y horarios por WhatsApp al confirmar tu pedido.</p>
+            </div>
+          )}
+        </section>
+
         <section className="space-y-3">
           <h2 className="text-base font-semibold text-gray-900">Datos de contacto</h2>
           <Field label="Nombre" required value={name} onChange={setName} placeholder="Tu nombre o razón social" />
@@ -150,44 +188,59 @@ export default function CheckoutClient({
           )}
         </section>
 
-        <section className="space-y-3">
-          <h2 className="text-base font-semibold text-gray-900">Dirección de despacho</h2>
-          <Field
-            label="Calle, número, depto"
-            required
-            value={address}
-            onChange={setAddress}
-            placeholder="Av. Macul 4321, depto 12B"
-          />
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Comuna</label>
-            <select
+        {deliveryMethod === 'domicilio' && (
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold text-gray-900">Dirección de despacho</h2>
+            <Field
+              label="Calle, número, depto"
               required
-              value={commune}
-              onChange={e => setCommune(e.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white"
-            >
-              {allCommunes.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-            {selectedZone && (
-              <p className="text-xs text-gray-500 mt-1">
-                Zona <strong>{selectedZone.name}</strong> · despacho {formatPrice(selectedZone.delivery_price)}
-              </p>
-            )}
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notas (opcional)</label>
+              value={address}
+              onChange={setAddress}
+              placeholder="Av. Macul 4321, depto 12B"
+            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Comuna</label>
+              <select
+                required
+                value={commune}
+                onChange={e => setCommune(e.target.value)}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white"
+              >
+                {allCommunes.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              {selectedZone && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Zona <strong>{selectedZone.name}</strong> · despacho {formatPrice(selectedZone.delivery_price)}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notas (opcional)</label>
+              <textarea
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                rows={3}
+                className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                placeholder="Ej: dejar con conserje, tocar timbre, sin cilantro…"
+              />
+            </div>
+          </section>
+        )}
+
+        {deliveryMethod === 'tienda' && (
+          <section className="space-y-3">
+            <h2 className="text-base font-semibold text-gray-900">Notas (opcional)</h2>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={3}
               className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
-              placeholder="Ej: dejar con conserje, tocar timbre, sin cilantro…"
+              placeholder="Ej: horario preferido para retirar, producto especial…"
             />
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* ── Método de pago ── */}
         <section className="space-y-3">
@@ -262,6 +315,8 @@ export default function CheckoutClient({
               <>Cargando carrito…</>
             ) : paymentMethod === 'webpay' ? (
               <><CreditCard size={16} /> Pagar {formatPrice(grandTotal)} con Webpay</>
+            ) : deliveryMethod === 'tienda' ? (
+              <><Store size={16} /> Confirmar retiro · {formatPrice(grandTotal)}</>
             ) : (
               <><Banknote size={16} /> Confirmar pedido · {formatPrice(grandTotal)}</>
             )}
@@ -282,6 +337,36 @@ export default function CheckoutClient({
 }
 
 function PayMethodCard({
+  selected,
+  onClick,
+  icon,
+  label,
+  sublabel,
+}: {
+  selected: boolean
+  onClick: () => void
+  icon: React.ReactNode
+  label: string
+  sublabel: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-col items-start gap-1.5 p-3 rounded-xl border-2 text-left transition-all cursor-pointer"
+      style={{
+        borderColor: selected ? ORANGE : '#E5E7EB',
+        background: selected ? '#FDE8D8' : '#fff',
+      }}
+    >
+      <span style={{ color: selected ? ORANGE : '#6B7280' }}>{icon}</span>
+      <span className="text-sm font-semibold text-gray-900">{label}</span>
+      <span className="text-xs text-gray-500">{sublabel}</span>
+    </button>
+  )
+}
+
+function DeliveryMethodCard({
   selected,
   onClick,
   icon,

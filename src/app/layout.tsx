@@ -48,8 +48,8 @@ export const metadata: Metadata = {
     images: ['/og-image.png'],
   },
   icons: {
-    icon: '/logo/elmenu-color.png',
-    apple: '/logo/elmenu-color.png',
+    icon: '/logo/elmenu-sin-fondo.png',
+    apple: '/logo/elmenu-sin-fondo.png',
   },
   robots: {
     index: true,

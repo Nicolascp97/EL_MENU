@@ -551,7 +551,10 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
   const [menuOpen, setMenuOpen] = useState(false)
   const [zonesOpen, setZonesOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'ofertas' | 'populares' | 'nuevos'>('ofertas')
-  const { addItem } = useCart()
+  const { addItem, toggleCart, items } = useCart()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  const itemCount = mounted ? items.reduce((sum, i) => sum + i.qty, 0) : 0
 
   // Cargar rol del usuario para condicionar la banda B2B.
   useEffect(() => {
@@ -662,6 +665,18 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
           </form>
           <div className="nav-right">
             <UserMenu className="nav-btn" />
+            <button
+              type="button"
+              className="nav-btn cart"
+              onClick={toggleCart}
+              aria-label="Ver carrito"
+              style={{ position: 'relative' }}
+            >
+              <IcoCart />
+              {itemCount > 0 && (
+                <span className="badge">{itemCount > 9 ? '9+' : itemCount}</span>
+              )}
+            </button>
             <button
               type="button"
               className="menu-btn"

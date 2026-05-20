@@ -5,7 +5,12 @@ import type { Zone, UserRole } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
 
-export default async function CheckoutPage() {
+type SearchParams = Promise<{ delivery?: string; payment?: string }>
+
+export default async function CheckoutPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams
+  const initialDelivery = params.delivery === 'tienda' ? 'tienda' : 'domicilio'
+  const initialPayment = params.payment === 'transfer' ? 'transfer' : 'webpay'
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -37,7 +42,7 @@ export default async function CheckoutPage() {
             Finalizar pedido
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            Revisa tu carrito, completa tus datos y paga con tarjeta de forma segura vía Transbank.
+            Revisa tu pedido, elige cómo recibirlo y paga con Transbank o transferencia.
           </p>
         </header>
 
@@ -48,6 +53,8 @@ export default async function CheckoutPage() {
           initialPhone={initialPhone}
           initialAddress={initialAddress}
           userEmail={user?.email ?? null}
+          initialDelivery={initialDelivery}
+          initialPayment={initialPayment}
         />
       </main>
     </div>
