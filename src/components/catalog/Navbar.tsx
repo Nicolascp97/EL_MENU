@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { ShoppingCart, Phone, Menu, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useCart } from '@/hooks/useCart'
 import UserMenu from '@/components/auth/UserMenu'
 
@@ -10,8 +10,21 @@ export default function Navbar() {
   const toggleCart = useCart(s => s.toggleCart)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
+  const [cartBump, setCartBump] = useState(false)
+  const prevCountRef = useRef<number | null>(null)
   useEffect(() => setMounted(true), [])
   const itemCount = mounted ? items.reduce((sum, i) => sum + i.qty, 0) : 0
+
+  useEffect(() => {
+    const count = items.reduce((s, i) => s + i.qty, 0)
+    if (prevCountRef.current !== null && count > prevCountRef.current) {
+      setCartBump(true)
+      const t = setTimeout(() => setCartBump(false), 500)
+      prevCountRef.current = count
+      return () => clearTimeout(t)
+    }
+    prevCountRef.current = count
+  }, [items])
 
   return (
     <header className="sticky top-0 z-50 bg-white border-b border-gray-100 shadow-sm">
@@ -78,7 +91,7 @@ export default function Navbar() {
 
           <button
             onClick={toggleCart}
-            className="relative flex items-center justify-center w-11 h-11 rounded-full transition-colors hover:bg-gray-100"
+            className={`relative flex items-center justify-center w-11 h-11 rounded-full transition-colors hover:bg-gray-100 ${cartBump ? 'cart-bump' : ''}`}
             aria-label="Ver carrito"
           >
             <ShoppingCart size={20} className="text-emerald-900" />

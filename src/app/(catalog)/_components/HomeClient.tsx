@@ -553,8 +553,21 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
   const [activeTab, setActiveTab] = useState<'ofertas' | 'populares' | 'nuevos'>('ofertas')
   const { addItem, toggleCart, items } = useCart()
   const [mounted, setMounted] = useState(false)
+  const [cartBump, setCartBump] = useState(false)
+  const prevCountRef = useRef<number | null>(null)
   useEffect(() => setMounted(true), [])
   const itemCount = mounted ? items.reduce((sum, i) => sum + i.qty, 0) : 0
+
+  useEffect(() => {
+    const count = items.reduce((s, i) => s + i.qty, 0)
+    if (prevCountRef.current !== null && count > prevCountRef.current) {
+      setCartBump(true)
+      const t = setTimeout(() => setCartBump(false), 500)
+      prevCountRef.current = count
+      return () => clearTimeout(t)
+    }
+    prevCountRef.current = count
+  }, [items])
 
   // Cargar rol del usuario para condicionar la banda B2B.
   useEffect(() => {
@@ -667,7 +680,7 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
             <UserMenu className="nav-btn" />
             <button
               type="button"
-              className="nav-btn cart"
+              className={`nav-btn cart${cartBump ? ' cart-bump' : ''}`}
               onClick={toggleCart}
               aria-label="Ver carrito"
               style={{ position: 'relative' }}
