@@ -183,10 +183,22 @@ export default function ChatWidget() {
   const pathname = usePathname()
   const { messages, setMessages, isLoading, isOpen, openChat, closeChat, sendMessage } = useChat()
   const { items } = useCart()
+  const cartIsOpen = useCart(s => s.isOpen)
   const [input, setInput] = useState('')
   const [showBubble, setShowBubble] = useState(false)
+  const [viewportW, setViewportW] = useState(0)
   const bottomRef = useRef<HTMLDivElement>(null)
   const processedRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    const update = () => setViewportW(window.innerWidth)
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
+  // When cart is open on desktop, shift FAB to the left of the drawer (384px wide)
+  const fabRight = (cartIsOpen && viewportW >= 640) ? 384 + 16 : 24
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -328,7 +340,11 @@ export default function ChatWidget() {
       {!isOpen && (
         <div
           className="menucito-fab-wrap"
-          style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10 }}
+          style={{
+            position: 'fixed', bottom: 24, right: fabRight, zIndex: 1000,
+            display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10,
+            transition: 'right 0.38s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          }}
         >
           {/* Speech bubble */}
           {showBubble && (

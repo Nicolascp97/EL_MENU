@@ -686,6 +686,7 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
               style={{ position: 'relative' }}
             >
               <IcoCart />
+              <span>Mi carrito</span>
               {itemCount > 0 && (
                 <span className="badge">{itemCount > 9 ? '9+' : itemCount}</span>
               )}
