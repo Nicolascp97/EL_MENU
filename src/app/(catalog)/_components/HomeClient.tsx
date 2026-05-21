@@ -153,8 +153,10 @@ const CSS = `
   .product .price { font-family: 'Fraunces', serif; font-weight: 700; font-size: 20px; color: var(--green-900); }
   .product .price small { font-size: 13px; font-weight: 500; color: var(--gray-500); margin-left: 2px; }
   .product .price .old { display: block; font-size: 12px; color: var(--gray-500); text-decoration: line-through; font-weight: 500; }
-  .product .add-yellow { width: 100%; height: 40px; border-radius: 10px; background: var(--orange); color: #fff; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all .15s ease; border: 0; cursor: pointer; }
+  .product .add-yellow { width: 100%; height: 40px; border-radius: 10px; background: var(--orange); color: #fff; font-weight: 700; font-size: 14px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: background .2s ease, transform .15s ease; border: 0; cursor: pointer; }
   .product .add-yellow:hover { background: var(--orange-dk); transform: translateY(-1px); }
+  .product .add-yellow.added { background: #2D6A4F; transform: scale(0.96); }
+  .product .add-yellow.added:hover { background: #2D6A4F; transform: scale(0.96); }
   .product-foot.col { flex-direction: column; align-items: stretch; gap: 10px; }
 
   /* AI SECTION */
@@ -552,6 +554,7 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
   const [zonesOpen, setZonesOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'ofertas' | 'populares' | 'nuevos'>('ofertas')
   const { addItem, toggleCart, items } = useCart()
+  const [justAddedId, setJustAddedId] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [cartBump, setCartBump] = useState(false)
   const prevCountRef = useRef<number | null>(null)
@@ -628,6 +631,12 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
     { id: 'berries',    label: '🍓 Berries',             href: '/catalogo?q=frutilla' },
     { id: 'temporada',  label: '⭐ Temporada',           href: '/catalogo?cat=temporada' },
   ]
+
+  function handleAddProduct(product: Product) {
+    addItem(product)
+    setJustAddedId(product.id)
+    setTimeout(() => setJustAddedId(id => id === product.id ? null : id), 1200)
+  }
 
   function onSearchSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -814,7 +823,13 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
                     <div className="unit">{p.unit}</div>
                     <div className="product-foot col">
                       <div className="price">{fmt(p.price)}</div>
-                      <button type="button" className="add-yellow" onClick={() => addItem(p)}>+ Agregar</button>
+                      <button
+                        type="button"
+                        className={`add-yellow${justAddedId === p.id ? ' added' : ''}`}
+                        onClick={() => handleAddProduct(p)}
+                      >
+                        {justAddedId === p.id ? '✓ Agregado' : '+ Agregar'}
+                      </button>
                     </div>
                   </div>
                 ))}
