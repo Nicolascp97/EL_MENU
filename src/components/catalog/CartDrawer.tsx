@@ -187,8 +187,8 @@ export default function CartDrawer() {
             <Link
               href={checkoutHref}
               onClick={toggleCart}
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-full font-semibold text-white text-sm transition-opacity hover:opacity-90"
-              style={{ backgroundColor: '#1B2B1E' }}
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-full font-semibold text-sm transition-opacity hover:opacity-90"
+              style={{ backgroundColor: '#1B2B1E', color: '#fff' }}
             >
               {paymentMethod === 'webpay' ? <CreditCard size={16} /> : <Banknote size={16} />}
               Continuar al pago
