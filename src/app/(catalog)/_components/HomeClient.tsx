@@ -853,6 +853,20 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
           </div>
           <div className="zones-frame">
             <ZonesMap />
+            <img
+              src="/logo/elmenu-sin-fondo.png"
+              alt="El Menú"
+              style={{
+                position: 'absolute',
+                top: '12%',
+                left: '7%',
+                width: 160,
+                opacity: 0.38,
+                pointerEvents: 'none',
+                zIndex: 1000,
+                filter: 'drop-shadow(0 2px 8px rgba(27,43,30,.18))',
+              }}
+            />
           </div>
           <div className="zones-legend">
             <div className="zl-item">
@@ -1092,7 +1106,8 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
               <a href="https://maps.google.com/?q=Los+Olmos+3967+Macul" target="_blank" rel="noopener noreferrer">Los Olmos 3967, Macul</a>
               <a href="https://wa.me/56954952395" target="_blank" rel="noopener noreferrer">+56 9 5495 2395</a>
               <a href="mailto:verduleriaelmenu@gmail.com">verduleriaelmenu@gmail.com</a>
-              <span>Lun–Sáb · 8:00 a 20:00</span>
+              <span>Lun–Sáb · 08:30 a 21:00</span>
+              <span>Dom · 09:00 a 15:00</span>
             </div>
           </div>
           <div className="foot-bottom">
