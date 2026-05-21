@@ -8,6 +8,31 @@ import { formatPrice } from '@/lib/utils'
 
 const DELIVERY_PRICE = 2990
 
+function OptionBtn({
+  active, onClick, icon, label, sub,
+}: {
+  active: boolean; onClick: () => void
+  icon: React.ReactNode; label: string; sub: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-2 px-2.5 py-2 rounded-lg border-2 text-left transition-all w-full"
+      style={{
+        borderColor: active ? '#E8621A' : '#E5E7EB',
+        background: active ? '#FDE8D8' : '#fff',
+      }}
+    >
+      <span style={{ color: active ? '#E8621A' : '#9CA3AF', flexShrink: 0 }}>{icon}</span>
+      <div className="min-w-0">
+        <p className="text-[11px] font-semibold text-gray-900 leading-tight truncate">{label}</p>
+        <p className="text-[10px] text-gray-500 leading-tight">{sub}</p>
+      </div>
+    </button>
+  )
+}
+
 export default function CartDrawer() {
   const { items, isOpen, toggleCart, updateQty, removeItem, clearCart, total } = useCart()
   const [deliveryMethod, setDeliveryMethod] = useState<'domicilio' | 'tienda'>('domicilio')
@@ -102,70 +127,38 @@ export default function CartDrawer() {
         {items.length > 0 && (
           <div className="border-t border-gray-100 px-4 py-4 space-y-3">
 
-            {/* Entrega */}
-            <div>
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Entrega</p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setDeliveryMethod('domicilio')}
-                  className="flex flex-col items-start gap-0.5 p-2.5 rounded-xl border-2 text-left transition-all"
-                  style={{
-                    borderColor: deliveryMethod === 'domicilio' ? '#E8621A' : '#E5E7EB',
-                    background: deliveryMethod === 'domicilio' ? '#FDE8D8' : '#fff',
-                  }}
-                >
-                  <Home size={15} style={{ color: deliveryMethod === 'domicilio' ? '#E8621A' : '#9CA3AF' }} />
-                  <span className="text-xs font-semibold text-gray-900 mt-0.5">A domicilio</span>
-                  <span className="text-[11px] text-gray-500">+{formatPrice(DELIVERY_PRICE)}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeliveryMethod('tienda')}
-                  className="flex flex-col items-start gap-0.5 p-2.5 rounded-xl border-2 text-left transition-all"
-                  style={{
-                    borderColor: deliveryMethod === 'tienda' ? '#E8621A' : '#E5E7EB',
-                    background: deliveryMethod === 'tienda' ? '#FDE8D8' : '#fff',
-                  }}
-                >
-                  <Store size={15} style={{ color: deliveryMethod === 'tienda' ? '#E8621A' : '#9CA3AF' }} />
-                  <span className="text-xs font-semibold text-gray-900 mt-0.5">Retiro en tienda</span>
-                  <span className="text-[11px] text-gray-500">Gratis</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Pago */}
-            <div>
-              <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">Pago</p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('webpay')}
-                  className="flex flex-col items-start gap-0.5 p-2.5 rounded-xl border-2 text-left transition-all"
-                  style={{
-                    borderColor: paymentMethod === 'webpay' ? '#E8621A' : '#E5E7EB',
-                    background: paymentMethod === 'webpay' ? '#FDE8D8' : '#fff',
-                  }}
-                >
-                  <CreditCard size={15} style={{ color: paymentMethod === 'webpay' ? '#E8621A' : '#9CA3AF' }} />
-                  <span className="text-xs font-semibold text-gray-900 mt-0.5">Transbank</span>
-                  <span className="text-[11px] text-gray-500">Débito y crédito</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMethod('transfer')}
-                  className="flex flex-col items-start gap-0.5 p-2.5 rounded-xl border-2 text-left transition-all"
-                  style={{
-                    borderColor: paymentMethod === 'transfer' ? '#E8621A' : '#E5E7EB',
-                    background: paymentMethod === 'transfer' ? '#FDE8D8' : '#fff',
-                  }}
-                >
-                  <Banknote size={15} style={{ color: paymentMethod === 'transfer' ? '#E8621A' : '#9CA3AF' }} />
-                  <span className="text-xs font-semibold text-gray-900 mt-0.5">Transferencia</span>
-                  <span className="text-[11px] text-gray-500">Datos al confirmar</span>
-                </button>
-              </div>
+            {/* Entrega + Pago en una sola fila de 2 columnas cada sección */}
+            <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+              <p className="col-span-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Entrega</p>
+              <OptionBtn
+                active={deliveryMethod === 'domicilio'}
+                onClick={() => setDeliveryMethod('domicilio')}
+                icon={<Home size={13} />}
+                label="A domicilio"
+                sub={`+${formatPrice(DELIVERY_PRICE)}`}
+              />
+              <OptionBtn
+                active={deliveryMethod === 'tienda'}
+                onClick={() => setDeliveryMethod('tienda')}
+                icon={<Store size={13} />}
+                label="Retiro en tienda"
+                sub="Gratis"
+              />
+              <p className="col-span-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider mt-1">Pago</p>
+              <OptionBtn
+                active={paymentMethod === 'webpay'}
+                onClick={() => setPaymentMethod('webpay')}
+                icon={<CreditCard size={13} />}
+                label="Transbank"
+                sub="Débito y crédito"
+              />
+              <OptionBtn
+                active={paymentMethod === 'transfer'}
+                onClick={() => setPaymentMethod('transfer')}
+                icon={<Banknote size={13} />}
+                label="Transferencia"
+                sub="Datos al confirmar"
+              />
             </div>
 
             {/* Totales */}
