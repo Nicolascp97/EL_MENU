@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       orderId: order.id,
       url: tbk.url,
-      // token eliminado: el cliente solo necesita la URL de redirect
+      token: tbk.token,
     })
   } catch (e) {
     await admin

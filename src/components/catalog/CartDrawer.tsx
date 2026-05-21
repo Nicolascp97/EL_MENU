@@ -53,7 +53,7 @@ export default function CartDrawer() {
       />
 
       {/* Drawer */}
-      <aside className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-sm bg-white shadow-2xl flex flex-col">
+      <aside aria-label="Carrito de compras" className="fixed right-0 top-0 bottom-0 z-50 w-full max-w-sm bg-white shadow-2xl flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-lg flex items-center gap-2" style={{ color: 'var(--green-dark)' }}>

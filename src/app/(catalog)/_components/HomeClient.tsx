@@ -110,7 +110,7 @@ const CSS = `
   .hero-circle .circle-label { font-size: 18px; font-weight: 700; text-align: center; line-height: 1.2; }
   .hero-circle.retail { background: var(--green-900); color: #fff; }
   .hero-circle.wholesale { background: var(--orange); color: #fff; }
-  .hero-circle .circle-cta { font-size: 12px; font-weight: 600; opacity: 0.72; letter-spacing: .04em; display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+  .hero-circle .circle-cta { font-size: 14px; font-weight: 600; opacity: 0.72; letter-spacing: .04em; display: flex; align-items: center; gap: 4px; margin-top: 2px; }
 
   /* SEARCH STRIP under hero */
   .hero-search-strip { margin-top: 28px; display: flex; gap: 10px; background: #fff; padding: 8px; border-radius: 100px; box-shadow: var(--shadow-md); max-width: 720px; margin-left: auto; margin-right: auto; }
@@ -344,7 +344,7 @@ const CSS = `
     .hero-circle { width: 150px; height: 150px; gap: 10px; }
     .hero-circle .circle-icon svg { width: 32px; height: 32px; }
     .hero-circle .circle-label { font-size: 14px; }
-    .hero-circle .circle-cta { font-size: 10px; }
+    .hero-circle .circle-cta { font-size: 12px; }
     .trust-strip { grid-template-columns: 1fr; padding: 22px 24px; }
     .ai-section { padding: 40px 24px; }
     .b2b { padding: 28px; }
@@ -353,7 +353,7 @@ const CSS = `
     .testis { grid-template-columns: 1fr; }
     .newsletter { padding: 32px 24px; }
     .foot-grid { grid-template-columns: 1fr; gap: 28px; padding-bottom: 28px; }
-    .nav-btn span { display: none; }
+    .nav-btn span:not(.badge) { display: none; }
     .marquee-group { gap: 2.5rem; padding-right: 2.5rem; font-size: 13px; }
     .hero-search-strip { flex-direction: row; padding: 6px; }
     .hero-search-strip button { padding: 0 18px; font-size: 13px; }
@@ -1008,16 +1008,30 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
         </div>
       </FadeUp>
 
-      {/* ═══ 10. NEWSLETTER / WHATSAPP ═══ */}
+      {/* ═══ 10. MENUCITO CTA ═══ */}
       <FadeUp>
         <div className="container">
-          <div className="newsletter">
+          <div className="newsletter" style={{ background: 'linear-gradient(120deg, #0F2A1A 0%, #1F4B35 100%)' }}>
             <div>
-              <span className="eye"><IcoWa size={14} /> Lista de WhatsApp</span>
-              <h2>Recibe las ofertas de la semana directo a tu WhatsApp.</h2>
-              <p>Un solo mensaje los lunes con lo de temporada, descuentos exclusivos y novedades. Sin spam, puedes darte de baja cuando quieras.</p>
+              <span className="eye"><IcoBot size={14} /> Asistente IA · Solo en El Menú</span>
+              <h2>Dile a Menucito lo que necesitas y listo.</h2>
+              <p>Cuéntale lo que quieres, él busca los productos disponibles, te muestra precios y agrega todo al carrito. Sin formularios, sin demoras.</p>
+              <div style={{ marginTop: 28 }}>
+                <OpenChatButton />
+              </div>
             </div>
-            <NewsletterForm />
+            <div className="chat" style={{ maxWidth: 300 }}>
+              <div className="chat-head">
+                <div className="chat-avatar"><IcoBot size={20} /></div>
+                <div className="info">
+                  <div className="n">Menucito</div>
+                  <div className="s">● En línea · Responde al instante</div>
+                </div>
+              </div>
+              <div className="msg bot">¡Hola! Soy Menucito 🌿 Cuéntame qué necesitas y te armo el pedido.</div>
+              <div className="msg user">Paltas y tomates para la semana</div>
+              <div className="msg bot">Claro, aquí tienes:<br/>🥑 Paltas Hass x4 — $3.290<br/>🍅 Tomates peritas kg — $1.490<br/><br/>¿Los agrego al carrito?</div>
+            </div>
           </div>
         </div>
       </FadeUp>
