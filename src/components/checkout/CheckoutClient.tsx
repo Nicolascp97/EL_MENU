@@ -322,6 +322,15 @@ export default function CheckoutClient({
             )}
           </button>
 
+          <button
+            type="button"
+            onClick={() => router.back()}
+            disabled={loading}
+            className="w-full inline-flex items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-all disabled:opacity-40"
+          >
+            ← Volver al catálogo
+          </button>
+
           <p className="text-[11px] text-gray-500 inline-flex items-center justify-center gap-1.5">
             {paymentMethod === 'webpay'
               ? <><Lock size={12} /> Pago seguro · <ShieldCheck size={12} /> Webpay Plus de Transbank</>
