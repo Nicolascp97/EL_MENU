@@ -146,6 +146,7 @@ export async function POST(req: NextRequest) {
       phone: body.phone.trim(),
       notes: body.notes?.trim() || null,
       payment_status: 'pendiente',
+      payment_method: 'webpay',
     })
     .select()
     .single()

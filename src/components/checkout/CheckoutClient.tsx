@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { CreditCard, Lock, ShieldCheck, Banknote, MessageCircle, Home, Store } from 'lucide-react'
+import { CreditCard, Lock, ShieldCheck, Banknote, MessageCircle, Home, Store, Ticket } from 'lucide-react'
 import { useCart } from '@/hooks/useCart'
 import { formatPrice } from '@/lib/utils'
 import OrderSummary from './OrderSummary'
@@ -16,7 +16,7 @@ type Props = {
   initialPhone: string | null
   initialAddress: string | null
   initialDelivery?: 'domicilio' | 'tienda'
-  initialPayment?: 'webpay' | 'transfer'
+  initialPayment?: 'webpay' | 'transfer' | 'amipass' | 'edenred'
 }
 
 const ORANGE = '#E8621A'
@@ -51,9 +51,11 @@ export default function CheckoutClient({
   const [address, setAddress] = useState(initialAddress ?? '')
   const [commune, setCommune] = useState(allCommunes[0] ?? '')
   const [notes, setNotes]         = useState('')
-  const [loading, setLoading]     = useState(false)
-  const [error, setError]         = useState<string | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<'webpay' | 'transfer'>(initialPayment)
+  const [loading, setLoading]         = useState(false)
+  const [loadingAmipass, setLoadingAmipass] = useState(false)
+  const [loadingEdenred, setLoadingEdenred] = useState(false)
+  const [error, setError]             = useState<string | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<'webpay' | 'transfer' | 'amipass' | 'edenred'>(initialPayment)
   const [deliveryMethod, setDeliveryMethod] = useState<'domicilio' | 'tienda'>(initialDelivery)
 
   const selectedZone = useMemo(
@@ -143,6 +145,74 @@ export default function CheckoutClient({
       const msg = err instanceof Error ? err.message : 'Error inesperado.'
       setError(msg)
       setLoading(false)
+    }
+  }
+
+  function validateCommonFields(): string | null {
+    if (!name.trim()) return 'Por favor ingresa tu nombre.'
+    if (!phone.trim()) return 'Por favor ingresa tu teléfono.'
+    if (deliveryMethod === 'domicilio' && !address.trim()) return 'Por favor ingresa tu dirección.'
+    if (deliveryMethod === 'domicilio' && !commune) return 'Por favor selecciona tu comuna.'
+    return null
+  }
+
+  async function handleAmipassPayment() {
+    const validationError = validateCommonFields()
+    if (validationError) { setError(validationError); return }
+    setError(null)
+    setLoadingAmipass(true)
+    try {
+      const finalAddress = deliveryMethod === 'tienda' ? 'Retiro en tienda' : address.trim()
+      const finalCommune = deliveryMethod === 'tienda' ? 'Retiro en tienda' : commune
+      const res = await fetch('/api/checkout/amipass', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: items.map(i => ({ product_id: i.product.id, qty: i.qty })),
+          address: finalAddress,
+          commune: finalCommune,
+          phone: phone.trim(),
+          name: name.trim(),
+          notes: notes.trim() || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error ?? 'No se pudo iniciar el pago con Amipass.')
+      clearCart()
+      window.location.href = data.url
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error inesperado.')
+      setLoadingAmipass(false)
+    }
+  }
+
+  async function handleEdenredPayment() {
+    const validationError = validateCommonFields()
+    if (validationError) { setError(validationError); return }
+    setError(null)
+    setLoadingEdenred(true)
+    try {
+      const finalAddress = deliveryMethod === 'tienda' ? 'Retiro en tienda' : address.trim()
+      const finalCommune = deliveryMethod === 'tienda' ? 'Retiro en tienda' : commune
+      const res = await fetch('/api/checkout/edenred', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: items.map(i => ({ product_id: i.product.id, qty: i.qty })),
+          address: finalAddress,
+          commune: finalCommune,
+          phone: phone.trim(),
+          name: name.trim(),
+          notes: notes.trim() || undefined,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error ?? 'No se pudo iniciar el pago con Edenred.')
+      clearCart()
+      window.location.href = data.url
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error inesperado.')
+      setLoadingEdenred(false)
     }
   }
 
@@ -260,6 +330,20 @@ export default function CheckoutClient({
               label="Transferencia"
               sublabel="Datos bancarios al confirmar"
             />
+            <PayMethodCard
+              selected={paymentMethod === 'amipass'}
+              onClick={() => setPaymentMethod('amipass')}
+              icon={<Ticket size={20} />}
+              label="Amipass"
+              sublabel="Tarjeta de alimentación"
+            />
+            <PayMethodCard
+              selected={paymentMethod === 'edenred'}
+              onClick={() => setPaymentMethod('edenred')}
+              icon={<Ticket size={20} />}
+              label="Edenred"
+              sublabel="Ticket Restaurant"
+            />
           </div>
 
           {paymentMethod === 'transfer' && (
@@ -292,6 +376,54 @@ export default function CheckoutClient({
               </div>
             </div>
           )}
+
+          {paymentMethod === 'amipass' && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3 text-sm">
+              <p className="font-semibold text-blue-900">Pago con Amipass</p>
+              <p className="text-gray-600">Serás redirigido al portal seguro de Amipass para autenticarte y autorizar el pago con tu tarjeta de alimentación.</p>
+              {mounted && (
+                <p className="text-blue-800 font-medium">
+                  Total a pagar: <span className="font-bold">{formatPrice(grandTotal)}</span>
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={handleAmipassPayment}
+                disabled={loadingAmipass || loading || loadingEdenred || !mounted}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold text-white disabled:opacity-60 transition-all"
+                style={{ background: loadingAmipass ? '#1e40af' : '#2563eb' }}
+              >
+                {loadingAmipass
+                  ? <>Conectando con Amipass…</>
+                  : <><Ticket size={16} /> Pagar {mounted ? formatPrice(grandTotal) : ''} con Amipass</>
+                }
+              </button>
+            </div>
+          )}
+
+          {paymentMethod === 'edenred' && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3 text-sm">
+              <p className="font-semibold text-red-900">Pago con Edenred</p>
+              <p className="text-gray-600">Serás redirigido al portal seguro de Edenred para autenticarte y autorizar el pago con tu Ticket Restaurant.</p>
+              {mounted && (
+                <p className="text-red-800 font-medium">
+                  Total a pagar: <span className="font-bold">{formatPrice(grandTotal)}</span>
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={handleEdenredPayment}
+                disabled={loadingEdenred || loading || loadingAmipass || !mounted}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold text-white disabled:opacity-60 transition-all"
+                style={{ background: loadingEdenred ? '#991b1b' : '#dc2626' }}
+              >
+                {loadingEdenred
+                  ? <>Conectando con Edenred…</>
+                  : <><Ticket size={16} /> Pagar {mounted ? formatPrice(grandTotal) : ''} con Edenred</>
+                }
+              </button>
+            </div>
+          )}
         </section>
 
         {error && (
@@ -301,31 +433,33 @@ export default function CheckoutClient({
         )}
 
         <div className="border-t border-gray-100 pt-4 flex flex-col gap-2">
-          <button
-            type="submit"
-            disabled={loading || !mounted}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold text-white disabled:opacity-60 transition-all"
-            style={{ background: loading ? ORANGE_DK : ORANGE }}
-            onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = ORANGE_DK }}
-            onMouseLeave={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = ORANGE }}
-          >
-            {loading ? (
-              <>Procesando…</>
-            ) : !mounted ? (
-              <>Cargando carrito…</>
-            ) : paymentMethod === 'webpay' ? (
-              <><CreditCard size={16} /> Pagar {formatPrice(grandTotal)} con Webpay</>
-            ) : deliveryMethod === 'tienda' ? (
-              <><Store size={16} /> Confirmar retiro · {formatPrice(grandTotal)}</>
-            ) : (
-              <><Banknote size={16} /> Confirmar pedido · {formatPrice(grandTotal)}</>
-            )}
-          </button>
+          {(paymentMethod === 'webpay' || paymentMethod === 'transfer') && (
+            <button
+              type="submit"
+              disabled={loading || !mounted}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold text-white disabled:opacity-60 transition-all"
+              style={{ background: loading ? ORANGE_DK : ORANGE }}
+              onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = ORANGE_DK }}
+              onMouseLeave={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = ORANGE }}
+            >
+              {loading ? (
+                <>Procesando…</>
+              ) : !mounted ? (
+                <>Cargando carrito…</>
+              ) : paymentMethod === 'webpay' ? (
+                <><CreditCard size={16} /> Pagar {formatPrice(grandTotal)} con Webpay</>
+              ) : deliveryMethod === 'tienda' ? (
+                <><Store size={16} /> Confirmar retiro · {formatPrice(grandTotal)}</>
+              ) : (
+                <><Banknote size={16} /> Confirmar pedido · {formatPrice(grandTotal)}</>
+              )}
+            </button>
+          )}
 
           <button
             type="button"
             onClick={() => router.back()}
-            disabled={loading}
+            disabled={loading || loadingAmipass || loadingEdenred}
             className="w-full inline-flex items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-all disabled:opacity-40"
           >
             ← Volver al catálogo
@@ -334,6 +468,10 @@ export default function CheckoutClient({
           <p className="text-[11px] text-gray-500 inline-flex items-center justify-center gap-1.5">
             {paymentMethod === 'webpay'
               ? <><Lock size={12} /> Pago seguro · <ShieldCheck size={12} /> Webpay Plus de Transbank</>
+              : paymentMethod === 'amipass'
+              ? <><Lock size={12} /> Pago seguro · <ShieldCheck size={12} /> Portal Amipass</>
+              : paymentMethod === 'edenred'
+              ? <><Lock size={12} /> Pago seguro · <ShieldCheck size={12} /> Portal Edenred</>
               : <><Lock size={12} /> Pedido seguro · Tu información está protegida</>
             }
           </p>

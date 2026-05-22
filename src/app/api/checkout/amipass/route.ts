@@ -13,64 +13,6 @@ type Body = {
   notes?: string
 }
 
-type OrderRow = {
-  id: string
-  total: number
-  phone: string
-  commune: string
-  address: string
-  items: { product_name: string; qty: number; unit: string }[]
-}
-
-// Rate limiting: máx 3 órdenes transfer/hora/IP
-const transferRateMap = new Map<string, { count: number; resetAt: number }>()
-
-function checkTransferRateLimit(ip: string): boolean {
-  const now = Date.now()
-  const entry = transferRateMap.get(ip)
-  if (!entry || now > entry.resetAt) {
-    transferRateMap.set(ip, { count: 1, resetAt: now + 3_600_000 })
-    return true
-  }
-  if (entry.count >= 3) return false
-  entry.count++
-  return true
-}
-
-async function notifyWhatsApp(order: OrderRow) {
-  const apiKey = process.env.CALLMEBOT_API_KEY
-  const waNumber = process.env.NEXT_PUBLIC_WA_NUMBER
-  if (!apiKey || !waNumber) return
-
-  const itemLines = (order.items ?? [])
-    .slice(0, 4)
-    .map(i => `• ${i.product_name} x${i.qty} ${i.unit}`)
-    .join('\n')
-  const extra = order.items.length > 4 ? `\n+${order.items.length - 4} productos más` : ''
-
-  const msg = [
-    `🥦 PEDIDO POR TRANSFERENCIA — El Menú`,
-    `#${order.id.slice(0, 8).toUpperCase()}`,
-    `💰 $${order.total.toLocaleString('es-CL')}`,
-    `📱 ${order.phone}`,
-    `📍 ${order.commune} — ${order.address}`,
-    `⚠️ Pendiente de confirmación de pago`,
-    ``,
-    itemLines + extra,
-  ].join('\n')
-
-  const url = `https://api.callmebot.com/whatsapp.php?phone=${waNumber}&text=${encodeURIComponent(msg)}&apikey=${apiKey}`
-  const controller = new AbortController()
-  const id = setTimeout(() => controller.abort(), 5000)
-  try {
-    await fetch(url, { signal: controller.signal })
-  } catch {
-    // Ignorar errores de notificación (no críticos)
-  } finally {
-    clearTimeout(id)
-  }
-}
-
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_ITEMS = 50
 
@@ -78,11 +20,9 @@ export async function POST(req: NextRequest) {
   const csrfError = checkOrigin(req)
   if (csrfError) return csrfError
 
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  if (process.env.NODE_ENV !== 'development' && !checkTransferRateLimit(ip)) {
-    return NextResponse.json({
-      error: 'Has realizado demasiadas solicitudes de transferencia. Intenta más tarde o contáctanos por WhatsApp.',
-    }, { status: 429 })
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  if (!appUrl) {
+    return NextResponse.json({ error: 'Configuración del servidor incompleta.' }, { status: 500 })
   }
 
   let body: Body
@@ -98,7 +38,6 @@ export async function POST(req: NextRequest) {
   if (!body.address?.trim() || !body.commune?.trim() || !body.phone?.trim()) {
     return NextResponse.json({ error: 'Completá dirección, comuna y teléfono.' }, { status: 400 })
   }
-
   if (body.items.length > MAX_ITEMS) {
     return NextResponse.json({ error: 'Demasiados productos en el carrito.' }, { status: 400 })
   }
@@ -211,7 +150,7 @@ export async function POST(req: NextRequest) {
       phone: body.phone.trim(),
       notes: body.notes?.trim() || null,
       payment_status: 'pendiente',
-      payment_method: 'transfer',
+      payment_method: 'amipass',
     })
     .select()
     .single()
@@ -219,7 +158,51 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No pude crear el pedido.' }, { status: 500 })
   }
 
-  notifyWhatsApp(order as OrderRow).catch(() => {})
+  // ── Iniciar transacción Amipass ───────────────────────────────────────────
+  // TODO: reemplaza estas variables con los valores reales del contrato Amipass/Pluxee.
+  // La URL base y los nombres de campos varían según el entorno (sandbox vs. producción).
+  const apiKey = process.env.AMIPASS_API_KEY
+  const secretKey = process.env.AMIPASS_SECRET_KEY
+  const apiBaseUrl = process.env.AMIPASS_API_BASE_URL // Ej: https://api.amipass.cl/v1
 
-  return NextResponse.json({ ok: true, orderId: order.id })
+  if (!apiKey || !secretKey || !apiBaseUrl) {
+    await admin.from('orders')
+      .update({ status: 'cancelado', payment_status: 'fallido' })
+      .eq('id', order.id)
+    return NextResponse.json({ error: 'Amipass no está configurado en el servidor.' }, { status: 500 })
+  }
+
+  try {
+    const amipassRes = await fetch(`${apiBaseUrl}/transactions/init`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Api-Key': apiKey,
+        'X-Api-Secret': secretKey,
+      },
+      body: JSON.stringify({
+        amount: total,                                         // Monto en CLP
+        orderId: order.id,                                     // Se recibe de vuelta en el webhook
+        returnUrl: `${appUrl}/api/payments/amipass/webhook`,  // Callback del proveedor
+        description: `Pedido El Menú #${order.id.slice(0, 8).toUpperCase()}`,
+      }),
+    })
+
+    if (!amipassRes.ok) {
+      throw new Error(`Amipass respondió ${amipassRes.status}`)
+    }
+
+    // TODO: ajusta según la respuesta real de la API Amipass
+    const amipassData = await amipassRes.json() as { redirectUrl: string }
+
+    return NextResponse.json({ url: amipassData.redirectUrl })
+  } catch (err) {
+    console.error('[Amipass] Error al iniciar transacción:', err)
+    await admin.from('orders')
+      .update({ status: 'cancelado', payment_status: 'fallido' })
+      .eq('id', order.id)
+    return NextResponse.json({
+      error: 'No se pudo conectar con Amipass. Intenta otro método de pago.',
+    }, { status: 502 })
+  }
 }
