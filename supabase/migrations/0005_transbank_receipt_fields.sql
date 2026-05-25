@@ -3,6 +3,12 @@
 -- Requeridos por Transbank para validación y puesta en producción
 -- ============================================================
 
+-- Arreglar constraint de payment_method (eliminar amipass y edenred)
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_payment_method_check;
+ALTER TABLE orders
+  ADD CONSTRAINT orders_payment_method_check
+  CHECK (payment_method IN ('webpay', 'transfer'));
+
 -- Código de autorización (6 dígitos que entrega Transbank al aprobar)
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS transbank_authorization_code TEXT;
 
