@@ -1,9 +1,10 @@
 'use client'
 import Link from 'next/link'
-import { ShoppingCart, Phone, Menu, X } from 'lucide-react'
+import { ShoppingCart, Phone, Menu, X, ShieldCheck } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useCart } from '@/hooks/useCart'
 import UserMenu from '@/components/auth/UserMenu'
+import { createClient } from '@/lib/supabase/client'
 
 export default function Navbar() {
   const items = useCart(s => s.items)
@@ -11,8 +12,25 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [cartBump, setCartBump] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const prevCountRef = useRef<number | null>(null)
   useEffect(() => setMounted(true), [])
+
+  // Verificar si el usuario es admin para mostrar el link en el menú mobile
+  useEffect(() => {
+    const supabase = createClient()
+    let active = true
+    async function checkAdmin() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!active || !user) return
+      const { data: profile } = await supabase
+        .from('profiles').select('role').eq('id', user.id).single()
+      if (active) setIsAdmin(profile?.role === 'admin')
+    }
+    checkAdmin()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => checkAdmin())
+    return () => { active = false; subscription.unsubscribe() }
+  }, [])
   const itemCount = mounted ? items.reduce((sum, i) => sum + i.qty, 0) : 0
 
   useEffect(() => {
@@ -126,6 +144,17 @@ export default function Navbar() {
             </div>
 
             <nav className="flex-1 px-3 py-4 flex flex-col gap-1 text-base font-medium text-gray-800 overflow-y-auto">
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 px-4 py-3 rounded-xl font-semibold transition-colors"
+                  style={{ background: '#FDE8D8', color: '#C44D0F' }}
+                >
+                  <ShieldCheck size={18} />
+                  Panel admin
+                </Link>
+              )}
               <Link
                 href="/"
                 onClick={() => setMobileOpen(false)}
