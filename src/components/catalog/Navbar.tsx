@@ -1,10 +1,13 @@
 'use client'
 import Link from 'next/link'
-import { ShoppingCart, Phone, Menu, X, ShieldCheck } from 'lucide-react'
+import { ShoppingCart, Phone, Menu, X, ShieldCheck, User, LogOut, ShoppingBag } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useCart } from '@/hooks/useCart'
 import UserMenu from '@/components/auth/UserMenu'
 import { createClient } from '@/lib/supabase/client'
+import { signOutAction } from '@/app/auth/actions'
+
+type UserSnap = { name: string | null; email: string; role: string } | null
 
 export default function Navbar() {
   const items = useCart(s => s.items)
@@ -13,25 +16,27 @@ export default function Navbar() {
   const [mounted, setMounted] = useState(false)
   const [cartBump, setCartBump] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [userSnap, setUserSnap] = useState<UserSnap>(null)
   const prevCountRef = useRef<number | null>(null)
   useEffect(() => setMounted(true), [])
 
-  // Detectar rol admin usando onAuthStateChange que dispara inmediatamente
-  // con la sesión en localStorage — sin esperar llamada de red extra.
   useEffect(() => {
     const supabase = createClient()
     let active = true
 
-    async function checkAdmin(userId: string) {
+    async function loadUser(userId: string, email: string) {
       const { data: profile } = await supabase
-        .from('profiles').select('role').eq('id', userId).single()
-      if (active) setIsAdmin(profile?.role === 'admin')
+        .from('profiles').select('role, name').eq('id', userId).single()
+      if (active) {
+        setIsAdmin(profile?.role === 'admin')
+        setUserSnap(profile ? { name: profile.name ?? null, email, role: profile.role } : null)
+      }
     }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return
-      if (session?.user) checkAdmin(session.user.id)
-      else setIsAdmin(false)
+      if (session?.user) loadUser(session.user.id, session.user.email ?? '')
+      else { setIsAdmin(false); setUserSnap(null) }
     })
 
     return () => { active = false; subscription.unsubscribe() }
@@ -110,7 +115,9 @@ export default function Navbar() {
             WhatsApp
           </a>
 
-          <UserMenu className="hidden md:inline-flex items-center gap-2 h-10 px-3 rounded-full text-sm font-medium text-gray-800 hover:bg-gray-100" />
+          <div className="hidden md:block">
+            <UserMenu className="inline-flex items-center gap-2 h-10 px-3 rounded-full text-sm font-medium text-gray-800 hover:bg-gray-100" />
+          </div>
 
           <button
             onClick={toggleCart}
@@ -190,7 +197,8 @@ export default function Navbar() {
               </Link>
             </nav>
 
-            <div className="px-3 py-4 border-t border-gray-100 space-y-3">
+            <div className="px-3 py-4 border-t border-gray-100 space-y-2">
+              {/* WhatsApp */}
               <a
                 href="https://wa.me/56954952395"
                 target="_blank"
@@ -202,7 +210,70 @@ export default function Navbar() {
                 </svg>
                 Pedir por WhatsApp
               </a>
-              <UserMenu className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-gray-800 bg-gray-50 hover:bg-gray-100 w-full" />
+
+              {/* Cuenta — inline, sin dropdown anidado */}
+              {userSnap ? (() => {
+                const initials = (userSnap.name ?? userSnap.email)
+                  .split(/[\s@.]+/).filter(Boolean).map((s: string) => s[0]).slice(0, 2).join('').toUpperCase() || '·'
+                const roleBg = userSnap.role === 'admin' ? '#FDE6CC' : userSnap.role === 'mayorista' ? '#D8F3DC' : '#EEF1ED'
+                return (
+                  <div className="rounded-xl border border-gray-200 overflow-hidden">
+                    {/* Cabecera usuario */}
+                    <div className="flex items-center gap-3 px-4 py-3 bg-gray-50">
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+                        style={{ background: '#1B2B1E' }}
+                      >
+                        {initials}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-gray-900 truncate">
+                          {userSnap.name ?? userSnap.email.split('@')[0]}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">{userSnap.email}</div>
+                      </div>
+                      <span
+                        className="text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 shrink-0"
+                        style={{ background: roleBg, color: '#1B2B1E' }}
+                      >
+                        {userSnap.role}
+                      </span>
+                    </div>
+                    {/* Links directos */}
+                    <Link href="/mi-cuenta" onClick={() => setMobileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 transition-colors">
+                      <User size={15} /> Mi perfil
+                    </Link>
+                    {userSnap.role === 'mayorista' && (
+                      <Link href="/mayorista" onClick={() => setMobileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 transition-colors">
+                        <ShoppingBag size={15} /> Catálogo mayorista
+                      </Link>
+                    )}
+                    {isAdmin && (
+                      <Link href="/admin" onClick={() => setMobileOpen(false)}
+                        className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 transition-colors">
+                        <ShieldCheck size={15} /> Panel admin
+                      </Link>
+                    )}
+                    <Link href="/mi-cuenta" onClick={() => setMobileOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-t border-gray-100 transition-colors">
+                      <ShoppingBag size={15} /> Mis pedidos
+                    </Link>
+                    <form action={signOutAction}>
+                      <button type="submit"
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-700 hover:bg-red-50 border-t border-gray-100 transition-colors">
+                        <LogOut size={15} /> Cerrar sesión
+                      </button>
+                    </form>
+                  </div>
+                )
+              })() : (
+                <Link href="/mayorista/login" onClick={() => setMobileOpen(false)}
+                  className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-gray-800 bg-gray-50 hover:bg-gray-100 w-full transition-colors">
+                  <User size={16} /> Ingresar
+                </Link>
+              )}
             </div>
           </aside>
         </>
