@@ -3,12 +3,15 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Product, Category } from '@/types/database'
 import { formatPrice } from '@/lib/utils'
-import { Pencil, Plus, ToggleLeft, ToggleRight, Star } from 'lucide-react'
+import { Pencil, Plus, ToggleLeft, ToggleRight, Star, Search, X, Package } from 'lucide-react'
 
 type Props = {
   initialProducts: Product[]
   categories: Category[]
 }
+
+const GREEN = '#1B2B1E'
+const ACCENT = '#E8621A'
 
 export default function ProductsAdminClient({ initialProducts, categories }: Props) {
   const [products, setProducts] = useState<Product[]>(initialProducts)
@@ -37,10 +40,14 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
     if (!editing) return
     setSaving(true)
     if (editing.id) {
-      const { data } = await supabase.from('products').update(editing).eq('id', editing.id).select('*, category:categories(*)').single()
+      const { data } = await supabase
+        .from('products').update(editing).eq('id', editing.id)
+        .select('*, category:categories(*)').single()
       if (data) setProducts(prev => prev.map(p => p.id === data.id ? data as Product : p))
     } else {
-      const { data } = await supabase.from('products').insert(editing).select('*, category:categories(*)').single()
+      const { data } = await supabase
+        .from('products').insert(editing)
+        .select('*, category:categories(*)').single()
       if (data) setProducts(prev => [data as Product, ...prev])
     }
     setSaving(false)
@@ -53,85 +60,200 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between gap-4">
+    <div className="px-4 py-5 md:px-6 md:py-6 space-y-5 pb-24 md:pb-6">
+
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--green-dark)', fontFamily: 'var(--font-fraunces)' }}>
+          <h1 className="text-2xl font-bold" style={{ color: GREEN, fontFamily: 'var(--font-fraunces)' }}>
             Productos
           </h1>
-          <p className="text-sm text-gray-500">{products.length} productos en catálogo</p>
+          <p className="text-sm text-gray-500 mt-0.5">{filtered.length} de {products.length} productos</p>
         </div>
         <button
           onClick={() => setEditing({ active: true, featured: false, unit: 'kg', stock: 0, images: [] })}
-          className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold text-white"
-          style={{ backgroundColor: 'var(--green-dark)' }}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold text-white shrink-0"
+          style={{ backgroundColor: GREEN }}
         >
           <Plus size={16} />
-          Nuevo producto
+          <span className="hidden sm:inline">Nuevo producto</span>
+          <span className="sm:hidden">Nuevo</span>
         </button>
       </div>
 
-      <input
-        type="search"
-        placeholder="Buscar producto..."
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        className="w-full max-w-sm px-4 py-2 rounded-full border border-gray-200 text-sm focus:outline-none"
-      />
+      {/* ── Buscador ── */}
+      <div className="relative">
+        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="search"
+          placeholder="Buscar producto..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 rounded-full border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 bg-white"
+        />
+        {search && (
+          <button
+            onClick={() => setSearch('')}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          >
+            <X size={14} />
+          </button>
+        )}
+      </div>
 
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      {/* ── MOBILE: tarjetas ── */}
+      <div className="md:hidden space-y-3">
+        {filtered.length === 0 && (
+          <div className="text-center py-12 text-gray-400">
+            <Package size={36} className="mx-auto mb-2 opacity-40" />
+            <p className="text-sm">No se encontraron productos</p>
+          </div>
+        )}
+        {filtered.map(product => (
+          <div
+            key={product.id}
+            className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3"
+            style={{ opacity: product.active ? 1 : 0.55 }}
+          >
+            {/* Nombre + categoría */}
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-semibold text-gray-900 leading-tight">{product.name}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {product.category?.name} · {product.unit}
+                </p>
+              </div>
+              {/* Acciones rápidas */}
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => toggleFeatured(product)}
+                  className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100"
+                  title="Destacado"
+                >
+                  <Star
+                    size={18}
+                    fill={product.featured ? ACCENT : 'none'}
+                    style={{ color: product.featured ? ACCENT : '#d1d5db' }}
+                  />
+                </button>
+                <button
+                  onClick={() => setEditing(product)}
+                  className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500"
+                  title="Editar"
+                >
+                  <Pencil size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Precios + stock + toggle */}
+            <div className="grid grid-cols-3 gap-2 text-sm">
+              <div className="bg-gray-50 rounded-xl px-3 py-2">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Precio</p>
+                <p className="font-semibold text-gray-900">{formatPrice(product.price)}</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl px-3 py-2">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Mayorista</p>
+                <p className="font-semibold text-gray-700">
+                  {product.price_wholesale ? formatPrice(product.price_wholesale) : '—'}
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-xl px-3 py-2">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Stock</p>
+                <input
+                  type="number"
+                  min="0"
+                  value={product.stock}
+                  onChange={e => updateStock(product.id, parseInt(e.target.value) || 0)}
+                  className="w-full text-sm font-semibold bg-transparent focus:outline-none text-gray-900"
+                />
+              </div>
+            </div>
+
+            {/* Toggle activo */}
+            <div className="flex items-center justify-between pt-1 border-t border-gray-50">
+              <span className="text-xs text-gray-500">{product.active ? 'Activo en catálogo' : 'Inactivo (oculto)'}</span>
+              <button onClick={() => toggleActive(product)}>
+                {product.active
+                  ? <ToggleRight size={26} style={{ color: '#2D6A4F' }} />
+                  : <ToggleLeft size={26} className="text-gray-300" />
+                }
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── DESKTOP: tabla ── */}
+      <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
         <table className="w-full text-sm">
-          <thead className="border-b border-gray-100">
-            <tr className="text-xs text-gray-500 uppercase tracking-wide">
-              <th className="px-4 py-3 text-left">Producto</th>
+          <thead>
+            <tr className="text-[11px] text-gray-400 uppercase tracking-wider border-b border-gray-100 bg-gray-50/60">
+              <th className="px-5 py-3 text-left">Producto</th>
               <th className="px-4 py-3 text-right">Precio</th>
               <th className="px-4 py-3 text-right">Mayorista</th>
-              <th className="px-4 py-3 text-center">Stock</th>
-              <th className="px-4 py-3 text-center">Activo</th>
-              <th className="px-4 py-3 text-center">Destacado</th>
-              <th className="px-4 py-3 text-center">Editar</th>
+              <th className="px-4 py-3 text-center w-24">Stock</th>
+              <th className="px-4 py-3 text-center w-20">Activo</th>
+              <th className="px-4 py-3 text-center w-20">Destac.</th>
+              <th className="px-4 py-3 text-center w-16">Editar</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={7} className="text-center py-12 text-gray-400 text-sm">
+                  No se encontraron productos
+                </td>
+              </tr>
+            )}
             {filtered.map(product => (
-              <tr key={product.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
+              <tr
+                key={product.id}
+                className="hover:bg-gray-50/60 transition-colors"
+                style={{ opacity: product.active ? 1 : 0.5 }}
+              >
+                <td className="px-5 py-3">
                   <p className="font-medium text-gray-900">{product.name}</p>
                   <p className="text-xs text-gray-400">{product.category?.name} · {product.unit}</p>
                 </td>
-                <td className="px-4 py-3 text-right font-medium">{formatPrice(product.price)}</td>
-                <td className="px-4 py-3 text-right text-gray-500">
+                <td className="px-4 py-3 text-right font-medium tabular-nums">
+                  {formatPrice(product.price)}
+                </td>
+                <td className="px-4 py-3 text-right text-gray-500 tabular-nums">
                   {product.price_wholesale ? formatPrice(product.price_wholesale) : '—'}
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 text-center">
                   <input
                     type="number"
                     min="0"
                     value={product.stock}
                     onChange={e => updateStock(product.id, parseInt(e.target.value) || 0)}
-                    className="w-16 text-center rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                    className="w-16 text-center rounded-lg border border-gray-200 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
                   />
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <button onClick={() => toggleActive(product)}>
+                  <button onClick={() => toggleActive(product)} className="inline-flex">
                     {product.active
-                      ? <ToggleRight size={22} style={{ color: 'var(--green-mid)' }} />
-                      : <ToggleLeft size={22} className="text-gray-300" />
+                      ? <ToggleRight size={24} style={{ color: '#2D6A4F' }} />
+                      : <ToggleLeft size={24} className="text-gray-300" />
                     }
                   </button>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <button onClick={() => toggleFeatured(product)}>
+                  <button onClick={() => toggleFeatured(product)} className="inline-flex">
                     <Star
                       size={18}
-                      fill={product.featured ? 'var(--accent)' : 'none'}
-                      style={{ color: product.featured ? 'var(--accent)' : '#d1d5db' }}
+                      fill={product.featured ? ACCENT : 'none'}
+                      style={{ color: product.featured ? ACCENT : '#d1d5db' }}
                     />
                   </button>
                 </td>
                 <td className="px-4 py-3 text-center">
-                  <button onClick={() => setEditing(product)} className="text-gray-400 hover:text-gray-700">
-                    <Pencil size={15} />
+                  <button
+                    onClick={() => setEditing(product)}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center mx-auto text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                  >
+                    <Pencil size={14} />
                   </button>
                 </td>
               </tr>
@@ -140,101 +262,164 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
         </table>
       </div>
 
-      {/* Edit modal */}
+      {/* ── Modal edición ── */}
       {editing && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 space-y-4 shadow-xl">
-            <h2 className="font-bold text-lg" style={{ color: 'var(--green-dark)' }}>
-              {editing.id ? 'Editar producto' : 'Nuevo producto'}
-            </h2>
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center p-0 md:p-4">
+          <div className="bg-white w-full md:max-w-md rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92dvh] overflow-y-auto">
+            {/* Handle mobile */}
+            <div className="md:hidden flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-gray-200" />
+            </div>
 
-            <div className="space-y-3">
-              <input
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
-                placeholder="Nombre del producto"
-                value={editing.name || ''}
-                onChange={e => setEditing({ ...editing, name: e.target.value })}
-              />
-              <textarea
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none"
-                placeholder="Descripción (opcional)"
-                rows={2}
-                value={editing.description || ''}
-                onChange={e => setEditing({ ...editing, description: e.target.value })}
-              />
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Precio (CLP)</label>
-                  <input
-                    type="number"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
-                    value={editing.price || ''}
-                    onChange={e => setEditing({ ...editing, price: parseInt(e.target.value) || 0 })}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Precio mayorista</label>
-                  <input
-                    type="number"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
-                    value={editing.price_wholesale || ''}
-                    onChange={e => setEditing({ ...editing, price_wholesale: parseInt(e.target.value) || undefined })}
-                  />
-                </div>
+            <div className="px-6 pb-6 pt-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="font-bold text-lg" style={{ color: GREEN, fontFamily: 'var(--font-fraunces)' }}>
+                  {editing.id ? 'Editar producto' : 'Nuevo producto'}
+                </h2>
+                <button
+                  onClick={() => setEditing(null)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400"
+                >
+                  <X size={18} />
+                </button>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+
+              <div className="space-y-3">
                 <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Unidad</label>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Nombre del producto *</label>
+                  <input
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    placeholder="Ej: Tomates cherry 500g"
+                    value={editing.name || ''}
+                    onChange={e => setEditing({ ...editing, name: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Descripción</label>
+                  <textarea
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    placeholder="Descripción opcional"
+                    rows={2}
+                    value={editing.description || ''}
+                    onChange={e => setEditing({ ...editing, description: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 mb-1 block">Precio (CLP) *</label>
+                    <input
+                      type="number"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      placeholder="0"
+                      value={editing.price || ''}
+                      onChange={e => setEditing({ ...editing, price: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 mb-1 block">Precio mayorista</label>
+                    <input
+                      type="number"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      placeholder="Opcional"
+                      value={editing.price_wholesale || ''}
+                      onChange={e => setEditing({ ...editing, price_wholesale: parseInt(e.target.value) || undefined })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 mb-1 block">Unidad</label>
+                    <select
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 bg-white"
+                      value={editing.unit || 'kg'}
+                      onChange={e => setEditing({ ...editing, unit: e.target.value })}
+                    >
+                      {['kg', 'unid', 'ramo', 'bolsa', 'maceta', 'caja', 'paq', 'gr'].map(u => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 mb-1 block">Stock inicial</label>
+                    <input
+                      type="number"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      placeholder="0"
+                      value={editing.stock ?? 0}
+                      onChange={e => setEditing({ ...editing, stock: parseInt(e.target.value) || 0 })}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Categoría</label>
                   <select
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
-                    value={editing.unit || 'kg'}
-                    onChange={e => setEditing({ ...editing, unit: e.target.value })}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 bg-white"
+                    value={editing.category_id || ''}
+                    onChange={e => setEditing({ ...editing, category_id: e.target.value })}
                   >
-                    {['kg', 'unid', 'ramo', 'bolsa', 'maceta', 'caja'].map(u => (
-                      <option key={u} value={u}>{u}</option>
+                    <option value="">Sin categoría</option>
+                    {categories.map(c => (
+                      <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className="text-xs text-gray-500 mb-1 block">Stock</label>
-                  <input
-                    type="number"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
-                    value={editing.stock || 0}
-                    onChange={e => setEditing({ ...editing, stock: parseInt(e.target.value) || 0 })}
-                  />
+
+                {/* Toggles activo / destacado */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditing({ ...editing, active: !editing.active })}
+                    className="flex items-center justify-between px-3 py-2.5 rounded-xl border-2 transition-all"
+                    style={{
+                      borderColor: editing.active ? '#2D6A4F' : '#e5e7eb',
+                      background: editing.active ? '#f0fdf4' : '#fff',
+                    }}
+                  >
+                    <span className="text-sm font-medium text-gray-700">Activo</span>
+                    {editing.active
+                      ? <ToggleRight size={22} style={{ color: '#2D6A4F' }} />
+                      : <ToggleLeft size={22} className="text-gray-300" />
+                    }
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditing({ ...editing, featured: !editing.featured })}
+                    className="flex items-center justify-between px-3 py-2.5 rounded-xl border-2 transition-all"
+                    style={{
+                      borderColor: editing.featured ? ACCENT : '#e5e7eb',
+                      background: editing.featured ? '#fff7ed' : '#fff',
+                    }}
+                  >
+                    <span className="text-sm font-medium text-gray-700">Destacado</span>
+                    <Star
+                      size={18}
+                      fill={editing.featured ? ACCENT : 'none'}
+                      style={{ color: editing.featured ? ACCENT : '#d1d5db' }}
+                    />
+                  </button>
                 </div>
               </div>
-              <div>
-                <label className="text-xs text-gray-500 mb-1 block">Categoría</label>
-                <select
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm"
-                  value={editing.category_id || ''}
-                  onChange={e => setEditing({ ...editing, category_id: e.target.value })}
-                >
-                  <option value="">Sin categoría</option>
-                  {categories.map(c => (
-                    <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
 
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setEditing(null)}
-                className="flex-1 py-2 rounded-full border border-gray-200 text-sm text-gray-600"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={saveProduct}
-                disabled={saving}
-                className="flex-1 py-2 rounded-full text-sm font-semibold text-white disabled:opacity-50"
-                style={{ backgroundColor: 'var(--green-dark)' }}
-              >
-                {saving ? 'Guardando...' : 'Guardar'}
-              </button>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setEditing(null)}
+                  className="flex-1 py-3 rounded-full border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveProduct}
+                  disabled={saving || !editing.name || !editing.price}
+                  className="flex-1 py-3 rounded-full text-sm font-semibold text-white disabled:opacity-50 transition-opacity"
+                  style={{ backgroundColor: GREEN }}
+                >
+                  {saving ? 'Guardando...' : editing.id ? 'Guardar cambios' : 'Crear producto'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
