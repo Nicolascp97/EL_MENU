@@ -16,6 +16,8 @@ export default function RegistroMayoristaPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [needsConfirmation, setNeedsConfirmation] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resendMsg, setResendMsg] = useState<string | null>(null)
 
   function update<K extends keyof typeof form>(key: K, value: string) {
     setForm(prev => ({ ...prev, [key]: value }))
@@ -25,6 +27,7 @@ export default function RegistroMayoristaPage() {
     e.preventDefault()
     setError(null)
     setLoading(true)
+
     const supabase = createClient()
     const { data, error: authError } = await supabase.auth.signUp({
       email: form.email,
@@ -38,53 +41,124 @@ export default function RegistroMayoristaPage() {
         },
       },
     })
+
     if (authError) {
       setError(traducirError(authError.message))
       setLoading(false)
       return
     }
+
+    // Notificar a Celso en segundo plano (no bloqueante)
+    fetch('/api/notify/registro', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        tipo: 'mayorista',
+      }),
+    }).catch(() => {
+      // No crítico — si falla la notificación, el registro igual fue exitoso
+    })
+
     if (!data.session) {
+      // Supabase requiere confirmación de correo
       setNeedsConfirmation(true)
       setLoading(false)
       return
     }
+
+    // Sesión activa (confirmación de email desactivada) → directo al catálogo mayorista
     router.push('/mayorista')
     router.refresh()
   }
 
+  async function handleResend() {
+    setResending(true)
+    setResendMsg(null)
+    const supabase = createClient()
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: form.email,
+    })
+    if (error) {
+      setResendMsg('No se pudo reenviar. Intenta en unos minutos.')
+    } else {
+      setResendMsg('✅ Correo reenviado. Revisa también tu carpeta de spam.')
+    }
+    setResending(false)
+  }
+
+  // ─── Pantalla de confirmación de email ───────────────────────
   if (needsConfirmation) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
-        <div className="w-full max-w-md text-center">
-          <div className="text-5xl mb-4">📬</div>
-          <h1 className="text-2xl font-bold mb-2" style={{ fontFamily: 'var(--font-fraunces)' }}>
-            Revisa tu correo
-          </h1>
-          <p className="text-gray-600 mb-6">
-            Te enviamos un mail a <strong>{form.email}</strong> para confirmar tu cuenta. Una vez
-            confirmado, el equipo de El Menú revisará tu solicitud y activará tu acceso mayorista en 24-48 horas.
-          </p>
-          <Link
-            href="/mayorista/login"
-            className="inline-block rounded-xl px-5 py-2.5 text-sm font-semibold text-white"
-            style={{ background: 'var(--green-dark, #1B2B1E)' }}
-          >
-            Ir a ingresar
-          </Link>
+        <div className="w-full max-w-md">
+          <div className="bg-white rounded-2xl border border-gray-200 p-8 shadow-sm text-center">
+            <div className="text-5xl mb-4">📬</div>
+            <h1
+              className="text-2xl font-bold mb-2"
+              style={{ fontFamily: 'var(--font-fraunces)' }}
+            >
+              Revisa tu correo
+            </h1>
+            <p className="text-gray-600 mb-2">
+              Te enviamos un mail a{' '}
+              <strong className="text-gray-800">{form.email}</strong>.
+            </p>
+            <p className="text-gray-500 text-sm mb-6">
+              Haz clic en el enlace del correo para activar tu cuenta. Una vez
+              confirmado, el equipo de El Menú revisará tu solicitud y activará
+              tu acceso mayorista en 24-48 horas.
+            </p>
+
+            {/* Resend */}
+            {resendMsg ? (
+              <p className="text-sm text-emerald-700 mb-4">{resendMsg}</p>
+            ) : (
+              <button
+                onClick={handleResend}
+                disabled={resending}
+                className="text-sm text-emerald-700 underline underline-offset-2 disabled:opacity-50 mb-4 block mx-auto"
+              >
+                {resending ? 'Reenviando…' : '¿No llegó? Reenviar correo'}
+              </button>
+            )}
+
+            <p className="text-xs text-gray-400 mb-6">
+              Revisa también la carpeta de{' '}
+              <span className="font-medium">correo no deseado / spam</span>.
+            </p>
+
+            <Link
+              href="/mayorista/login"
+              className="inline-block rounded-xl px-5 py-2.5 text-sm font-semibold text-white"
+              style={{ background: 'var(--green-dark, #1B2B1E)' }}
+            >
+              Ir a ingresar →
+            </Link>
+          </div>
         </div>
       </div>
     )
   }
 
+  // ─── Formulario de registro ───────────────────────────────────
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-12">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 text-2xl mb-4">
             <span>🥦</span>
-            <span className="font-bold" style={{ color: 'var(--green-dark)' }}>El Menú</span>
+            <span className="font-bold" style={{ color: 'var(--green-dark)' }}>
+              El Menú
+            </span>
           </Link>
-          <h1 className="text-2xl font-bold" style={{ fontFamily: 'var(--font-fraunces)' }}>
+          <h1
+            className="text-2xl font-bold"
+            style={{ fontFamily: 'var(--font-fraunces)' }}
+          >
             Crear cuenta mayorista
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -97,7 +171,10 @@ export default function RegistroMayoristaPage() {
           className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4"
         >
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Nombre o razón social
             </label>
             <input
@@ -112,7 +189,10 @@ export default function RegistroMayoristaPage() {
           </div>
 
           <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="phone"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Teléfono de contacto
             </label>
             <input
@@ -128,7 +208,10 @@ export default function RegistroMayoristaPage() {
           </div>
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Correo
             </label>
             <input
@@ -144,7 +227,10 @@ export default function RegistroMayoristaPage() {
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Contraseña
             </label>
             <input
@@ -182,7 +268,10 @@ export default function RegistroMayoristaPage() {
 
         <p className="text-center text-sm text-gray-500 mt-6">
           ¿Ya tienes cuenta?{' '}
-          <Link href="/mayorista/login" className="font-semibold text-emerald-700 hover:underline">
+          <Link
+            href="/mayorista/login"
+            className="font-semibold text-emerald-700 hover:underline"
+          >
             Ingresa
           </Link>
         </p>
@@ -200,5 +289,8 @@ function traducirError(msg: string): string {
     return 'La contraseña tiene que tener al menos 8 caracteres.'
   }
   if (m.includes('email')) return 'El correo no es válido.'
+  if (m.includes('rate limit') || m.includes('too many')) {
+    return 'Demasiados intentos. Espera unos minutos y vuelve a intentarlo.'
+  }
   return msg
 }

@@ -27,9 +27,10 @@ export async function proxy(request: NextRequest) {
 
   // /admin → solo usuarios autenticados (la verificación de rol admin
   // se hace dentro de la página/route handler).
-  if (pathname.startsWith('/admin') && !user) {
+  // /login es la página de ingreso exclusiva para Celso (admin) — no redirigir ahí.
+  if (pathname.startsWith('/admin') && pathname !== '/login' && !user) {
     return NextResponse.redirect(
-      new URL(`/mayorista/login?next=${encodeURIComponent(pathname)}`, request.url)
+      new URL(`/login?next=${encodeURIComponent(pathname)}`, request.url)
     )
   }
 

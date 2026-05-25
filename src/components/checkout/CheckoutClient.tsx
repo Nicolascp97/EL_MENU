@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { CreditCard, Lock, ShieldCheck, Banknote, MessageCircle, Home, Store, Ticket } from 'lucide-react'
+import { CreditCard, Lock, ShieldCheck, Banknote, MessageCircle, Home, Store } from 'lucide-react'
 import { useCart } from '@/hooks/useCart'
 import { formatPrice } from '@/lib/utils'
 import OrderSummary from './OrderSummary'
@@ -16,11 +16,21 @@ type Props = {
   initialPhone: string | null
   initialAddress: string | null
   initialDelivery?: 'domicilio' | 'tienda'
-  initialPayment?: 'webpay' | 'transfer' | 'amipass' | 'edenred'
+  initialPayment?: 'webpay' | 'transfer'
 }
 
-const ORANGE = '#E8621A'
+const ORANGE    = '#E8621A'
 const ORANGE_DK = '#C44F0E'
+
+// Datos bancarios de El Menú SpA
+const BANK_DATA = {
+  razon:   'Verdulería El Menú SpA',
+  rut:     '77.190.604-4',
+  banco:   'Banco Santander',
+  tipo:    'Cuenta Corriente',
+  numero:  '0-000-9399840-5',
+  email:   'verdurerias.elmenu@gmail.com',
+} as const
 
 export default function CheckoutClient({
   zones,
@@ -30,11 +40,11 @@ export default function CheckoutClient({
   initialPhone,
   initialAddress,
   initialDelivery = 'domicilio',
-  initialPayment = 'webpay',
+  initialPayment  = 'webpay',
 }: Props) {
-  const router = useRouter()
-  const items = useCart(s => s.items)
-  const total = useCart(s => s.total)
+  const router    = useRouter()
+  const items     = useCart(s => s.items)
+  const total     = useCart(s => s.total)
   const clearCart = useCart(s => s.clearCart)
 
   const [mounted, setMounted] = useState(false)
@@ -46,21 +56,21 @@ export default function CheckoutClient({
     return Array.from(set).sort()
   }, [zones])
 
-  const [name, setName]       = useState(initialName ?? '')
-  const [phone, setPhone]     = useState(initialPhone ?? '')
-  const [address, setAddress] = useState(initialAddress ?? '')
-  const [commune, setCommune] = useState(allCommunes[0] ?? '')
-  const [notes, setNotes]         = useState('')
-  const [loading, setLoading]         = useState(false)
-  const [loadingAmipass, setLoadingAmipass] = useState(false)
-  const [loadingEdenred, setLoadingEdenred] = useState(false)
-  const [error, setError]             = useState<string | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<'webpay' | 'transfer' | 'amipass' | 'edenred'>(initialPayment)
+  const [name,           setName]           = useState(initialName    ?? '')
+  const [phone,          setPhone]          = useState(initialPhone   ?? '')
+  const [address,        setAddress]        = useState(initialAddress ?? '')
+  const [commune,        setCommune]        = useState(allCommunes[0] ?? '')
+  const [notes,          setNotes]          = useState('')
+  const [loading,        setLoading]        = useState(false)
+  const [error,          setError]          = useState<string | null>(null)
+  const [paymentMethod,  setPaymentMethod]  = useState<'webpay' | 'transfer'>(
+    initialPayment === 'webpay' || initialPayment === 'transfer' ? initialPayment : 'webpay'
+  )
   const [deliveryMethod, setDeliveryMethod] = useState<'domicilio' | 'tienda'>(initialDelivery)
 
   const selectedZone = useMemo(
     () => zones.find(z => z.communes.includes(commune)) ?? null,
-    [zones, commune]
+    [zones, commune],
   )
 
   const grandTotal = mounted
@@ -98,12 +108,12 @@ export default function CheckoutClient({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            items: items.map(i => ({ product_id: i.product.id, qty: i.qty })),
+            items:   items.map(i => ({ product_id: i.product.id, qty: i.qty })),
             address: finalAddress,
             commune: finalCommune,
-            phone: phone.trim(),
-            name: name.trim(),
-            notes: notes.trim() || undefined,
+            phone:   phone.trim(),
+            name:    name.trim(),
+            notes:   notes.trim() || undefined,
           }),
         })
         const data = await res.json()
@@ -113,106 +123,36 @@ export default function CheckoutClient({
         return
       }
 
-      // Webpay flow
+      // ── Webpay flow ──────────────────────────────────────────
       const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: items.map(i => ({ product_id: i.product.id, qty: i.qty })),
+          items:   items.map(i => ({ product_id: i.product.id, qty: i.qty })),
           address: finalAddress,
           commune: finalCommune,
-          phone: phone.trim(),
-          notes: notes.trim() || undefined,
+          phone:   phone.trim(),
+          notes:   notes.trim() || undefined,
         }),
       })
-
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error ?? 'No se pudo iniciar el pago.')
 
       clearCart()
 
-      const form = document.createElement('form')
+      const form  = document.createElement('form')
       form.method = 'POST'
       form.action = data.url
-      const input = document.createElement('input')
-      input.type = 'hidden'
-      input.name = 'token_ws'
-      input.value = data.token
+      const input  = document.createElement('input')
+      input.type   = 'hidden'
+      input.name   = 'token_ws'
+      input.value  = data.token
       form.appendChild(input)
       document.body.appendChild(form)
       form.submit()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Error inesperado.'
-      setError(msg)
+      setError(err instanceof Error ? err.message : 'Error inesperado.')
       setLoading(false)
-    }
-  }
-
-  function validateCommonFields(): string | null {
-    if (!name.trim()) return 'Por favor ingresa tu nombre.'
-    if (!phone.trim()) return 'Por favor ingresa tu teléfono.'
-    if (deliveryMethod === 'domicilio' && !address.trim()) return 'Por favor ingresa tu dirección.'
-    if (deliveryMethod === 'domicilio' && !commune) return 'Por favor selecciona tu comuna.'
-    return null
-  }
-
-  async function handleAmipassPayment() {
-    const validationError = validateCommonFields()
-    if (validationError) { setError(validationError); return }
-    setError(null)
-    setLoadingAmipass(true)
-    try {
-      const finalAddress = deliveryMethod === 'tienda' ? 'Retiro en tienda' : address.trim()
-      const finalCommune = deliveryMethod === 'tienda' ? 'Retiro en tienda' : commune
-      const res = await fetch('/api/checkout/amipass', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: items.map(i => ({ product_id: i.product.id, qty: i.qty })),
-          address: finalAddress,
-          commune: finalCommune,
-          phone: phone.trim(),
-          name: name.trim(),
-          notes: notes.trim() || undefined,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error ?? 'No se pudo iniciar el pago con Amipass.')
-      clearCart()
-      window.location.href = data.url
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error inesperado.')
-      setLoadingAmipass(false)
-    }
-  }
-
-  async function handleEdenredPayment() {
-    const validationError = validateCommonFields()
-    if (validationError) { setError(validationError); return }
-    setError(null)
-    setLoadingEdenred(true)
-    try {
-      const finalAddress = deliveryMethod === 'tienda' ? 'Retiro en tienda' : address.trim()
-      const finalCommune = deliveryMethod === 'tienda' ? 'Retiro en tienda' : commune
-      const res = await fetch('/api/checkout/edenred', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: items.map(i => ({ product_id: i.product.id, qty: i.qty })),
-          address: finalAddress,
-          commune: finalCommune,
-          phone: phone.trim(),
-          name: name.trim(),
-          notes: notes.trim() || undefined,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error ?? 'No se pudo iniciar el pago con Edenred.')
-      clearCart()
-      window.location.href = data.url
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error inesperado.')
-      setLoadingEdenred(false)
     }
   }
 
@@ -220,7 +160,7 @@ export default function CheckoutClient({
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
       <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-5">
 
-        {/* ── Tipo de entrega ── */}
+        {/* ── Tipo de entrega ─────────────────────────────────── */}
         <section className="space-y-3">
           <h2 className="text-base font-semibold text-gray-900">Tipo de entrega</h2>
           <div className="grid grid-cols-2 gap-3">
@@ -247,6 +187,7 @@ export default function CheckoutClient({
           )}
         </section>
 
+        {/* ── Datos de contacto ───────────────────────────────── */}
         <section className="space-y-3">
           <h2 className="text-base font-semibold text-gray-900">Datos de contacto</h2>
           <Field label="Nombre" required value={name} onChange={setName} placeholder="Tu nombre o razón social" />
@@ -258,6 +199,7 @@ export default function CheckoutClient({
           )}
         </section>
 
+        {/* ── Dirección ───────────────────────────────────────── */}
         {deliveryMethod === 'domicilio' && (
           <section className="space-y-3">
             <h2 className="text-base font-semibold text-gray-900">Dirección de despacho</h2>
@@ -312,7 +254,7 @@ export default function CheckoutClient({
           </section>
         )}
 
-        {/* ── Método de pago ── */}
+        {/* ── Método de pago ──────────────────────────────────── */}
         <section className="space-y-3">
           <h2 className="text-base font-semibold text-gray-900">Método de pago</h2>
           <div className="grid grid-cols-2 gap-3">
@@ -328,100 +270,59 @@ export default function CheckoutClient({
               onClick={() => setPaymentMethod('transfer')}
               icon={<Banknote size={20} />}
               label="Transferencia"
-              sublabel="Datos bancarios al confirmar"
-            />
-            <PayMethodCard
-              selected={paymentMethod === 'amipass'}
-              onClick={() => setPaymentMethod('amipass')}
-              icon={<Ticket size={20} />}
-              label="Amipass"
-              sublabel="Tarjeta de alimentación"
-            />
-            <PayMethodCard
-              selected={paymentMethod === 'edenred'}
-              onClick={() => setPaymentMethod('edenred')}
-              icon={<Ticket size={20} />}
-              label="Edenred"
-              sublabel="Ticket Restaurant"
+              sublabel="Banco Santander"
             />
           </div>
 
+          {/* ── Bloque datos de transferencia ── */}
           {paymentMethod === 'transfer' && (
             <div className="rounded-xl border border-orange-200 bg-orange-50 p-4 space-y-3 text-sm">
               <p className="font-semibold text-orange-900">Datos para la transferencia</p>
               <dl className="space-y-1 text-gray-700">
-                <div className="flex gap-2"><dt className="text-gray-500 w-28 shrink-0">Banco</dt><dd>Banco de Chile</dd></div>
-                <div className="flex gap-2"><dt className="text-gray-500 w-28 shrink-0">Tipo de cuenta</dt><dd>Cuenta Corriente</dd></div>
-                {/* TODO: Celso debe completar estos datos */}
-                <div className="flex gap-2"><dt className="text-gray-500 w-28 shrink-0">N° de cuenta</dt><dd className="font-mono">— Consultar a Celso —</dd></div>
-                <div className="flex gap-2"><dt className="text-gray-500 w-28 shrink-0">RUT titular</dt><dd className="font-mono">— Consultar a Celso —</dd></div>
-                <div className="flex gap-2"><dt className="text-gray-500 w-28 shrink-0">Nombre</dt><dd>El Menú SpA</dd></div>
-                <div className="flex gap-2"><dt className="text-gray-500 w-28 shrink-0">Email</dt><dd>— Consultar a Celso —</dd></div>
+                <div className="flex gap-2">
+                  <dt className="text-gray-500 w-32 shrink-0">Nombre</dt>
+                  <dd className="font-medium">{BANK_DATA.razon}</dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="text-gray-500 w-32 shrink-0">RUT</dt>
+                  <dd className="font-mono">{BANK_DATA.rut}</dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="text-gray-500 w-32 shrink-0">Banco</dt>
+                  <dd>{BANK_DATA.banco}</dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="text-gray-500 w-32 shrink-0">Tipo de cuenta</dt>
+                  <dd>{BANK_DATA.tipo}</dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="text-gray-500 w-32 shrink-0">N° de cuenta</dt>
+                  <dd className="font-mono font-semibold">{BANK_DATA.numero}</dd>
+                </div>
+                <div className="flex gap-2">
+                  <dt className="text-gray-500 w-32 shrink-0">Email</dt>
+                  <dd>{BANK_DATA.email}</dd>
+                </div>
                 {mounted && (
-                  <div className="flex gap-2 pt-1 border-t border-orange-200">
-                    <dt className="text-gray-500 w-28 shrink-0">Monto</dt>
-                    <dd className="font-bold text-orange-900">{formatPrice(grandTotal)}</dd>
+                  <div className="flex gap-2 pt-2 border-t border-orange-200">
+                    <dt className="text-gray-500 w-32 shrink-0">Monto</dt>
+                    <dd className="font-bold text-orange-900 text-base">{formatPrice(grandTotal)}</dd>
                   </div>
                 )}
                 {name && (
                   <div className="flex gap-2">
-                    <dt className="text-gray-500 w-28 shrink-0">Asunto</dt>
+                    <dt className="text-gray-500 w-32 shrink-0">Asunto</dt>
                     <dd>Pedido {name}</dd>
                   </div>
                 )}
               </dl>
               <div className="flex items-start gap-2 text-orange-800 bg-orange-100 rounded-lg p-3">
                 <MessageCircle size={16} className="shrink-0 mt-0.5" />
-                <p>Una vez realizada la transferencia, envía el comprobante por WhatsApp al <strong>+56 9 5495 2395</strong> para confirmar tu pedido.</p>
+                <p>
+                  Una vez realizada la transferencia, envía el comprobante por WhatsApp al{' '}
+                  <strong>+56 9 5495 2395</strong> para confirmar tu pedido.
+                </p>
               </div>
-            </div>
-          )}
-
-          {paymentMethod === 'amipass' && (
-            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 space-y-3 text-sm">
-              <p className="font-semibold text-blue-900">Pago con Amipass</p>
-              <p className="text-gray-600">Serás redirigido al portal seguro de Amipass para autenticarte y autorizar el pago con tu tarjeta de alimentación.</p>
-              {mounted && (
-                <p className="text-blue-800 font-medium">
-                  Total a pagar: <span className="font-bold">{formatPrice(grandTotal)}</span>
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={handleAmipassPayment}
-                disabled={loadingAmipass || loading || loadingEdenred || !mounted}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold text-white disabled:opacity-60 transition-all"
-                style={{ background: loadingAmipass ? '#1e40af' : '#2563eb' }}
-              >
-                {loadingAmipass
-                  ? <>Conectando con Amipass…</>
-                  : <><Ticket size={16} /> Pagar {mounted ? formatPrice(grandTotal) : ''} con Amipass</>
-                }
-              </button>
-            </div>
-          )}
-
-          {paymentMethod === 'edenred' && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 space-y-3 text-sm">
-              <p className="font-semibold text-red-900">Pago con Edenred</p>
-              <p className="text-gray-600">Serás redirigido al portal seguro de Edenred para autenticarte y autorizar el pago con tu Ticket Restaurant.</p>
-              {mounted && (
-                <p className="text-red-800 font-medium">
-                  Total a pagar: <span className="font-bold">{formatPrice(grandTotal)}</span>
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={handleEdenredPayment}
-                disabled={loadingEdenred || loading || loadingAmipass || !mounted}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-full py-2.5 text-sm font-semibold text-white disabled:opacity-60 transition-all"
-                style={{ background: loadingEdenred ? '#991b1b' : '#dc2626' }}
-              >
-                {loadingEdenred
-                  ? <>Conectando con Edenred…</>
-                  : <><Ticket size={16} /> Pagar {mounted ? formatPrice(grandTotal) : ''} con Edenred</>
-                }
-              </button>
             </div>
           )}
         </section>
@@ -432,34 +333,33 @@ export default function CheckoutClient({
           </div>
         )}
 
+        {/* ── Botón de acción ─────────────────────────────────── */}
         <div className="border-t border-gray-100 pt-4 flex flex-col gap-2">
-          {(paymentMethod === 'webpay' || paymentMethod === 'transfer') && (
-            <button
-              type="submit"
-              disabled={loading || !mounted}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold text-white disabled:opacity-60 transition-all"
-              style={{ background: loading ? ORANGE_DK : ORANGE }}
-              onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = ORANGE_DK }}
-              onMouseLeave={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = ORANGE }}
-            >
-              {loading ? (
-                <>Procesando…</>
-              ) : !mounted ? (
-                <>Cargando carrito…</>
-              ) : paymentMethod === 'webpay' ? (
-                <><CreditCard size={16} /> Pagar {formatPrice(grandTotal)} con Webpay</>
-              ) : deliveryMethod === 'tienda' ? (
-                <><Store size={16} /> Confirmar retiro · {formatPrice(grandTotal)}</>
-              ) : (
-                <><Banknote size={16} /> Confirmar pedido · {formatPrice(grandTotal)}</>
-              )}
-            </button>
-          )}
+          <button
+            type="submit"
+            disabled={loading || !mounted}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-full py-3 text-sm font-semibold text-white disabled:opacity-60 transition-all"
+            style={{ background: loading ? ORANGE_DK : ORANGE }}
+            onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = ORANGE_DK }}
+            onMouseLeave={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.background = ORANGE }}
+          >
+            {loading ? (
+              <>Procesando…</>
+            ) : !mounted ? (
+              <>Cargando carrito…</>
+            ) : paymentMethod === 'webpay' ? (
+              <><CreditCard size={16} /> Pagar {formatPrice(grandTotal)} con Webpay</>
+            ) : deliveryMethod === 'tienda' ? (
+              <><Store size={16} /> Confirmar retiro · {formatPrice(grandTotal)}</>
+            ) : (
+              <><Banknote size={16} /> Confirmar pedido · {formatPrice(grandTotal)}</>
+            )}
+          </button>
 
           <button
             type="button"
             onClick={() => router.back()}
-            disabled={loading || loadingAmipass || loadingEdenred}
+            disabled={loading}
             className="w-full inline-flex items-center justify-center gap-1.5 rounded-full py-2.5 text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-all disabled:opacity-40"
           >
             ← Volver al catálogo
@@ -468,10 +368,6 @@ export default function CheckoutClient({
           <p className="text-[11px] text-gray-500 inline-flex items-center justify-center gap-1.5">
             {paymentMethod === 'webpay'
               ? <><Lock size={12} /> Pago seguro · <ShieldCheck size={12} /> Webpay Plus de Transbank</>
-              : paymentMethod === 'amipass'
-              ? <><Lock size={12} /> Pago seguro · <ShieldCheck size={12} /> Portal Amipass</>
-              : paymentMethod === 'edenred'
-              ? <><Lock size={12} /> Pago seguro · <ShieldCheck size={12} /> Portal Edenred</>
               : <><Lock size={12} /> Pedido seguro · Tu información está protegida</>
             }
           </p>
@@ -483,28 +379,19 @@ export default function CheckoutClient({
   )
 }
 
+// ── Sub-componentes ──────────────────────────────────────────────────────────
+
 function PayMethodCard({
-  selected,
-  onClick,
-  icon,
-  label,
-  sublabel,
+  selected, onClick, icon, label, sublabel,
 }: {
-  selected: boolean
-  onClick: () => void
-  icon: React.ReactNode
-  label: string
-  sublabel: string
+  selected: boolean; onClick: () => void; icon: React.ReactNode; label: string; sublabel: string
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="flex flex-col items-start gap-1.5 p-3 rounded-xl border-2 text-left transition-all cursor-pointer"
-      style={{
-        borderColor: selected ? ORANGE : '#E5E7EB',
-        background: selected ? '#FDE8D8' : '#fff',
-      }}
+      style={{ borderColor: selected ? ORANGE : '#E5E7EB', background: selected ? '#FDE8D8' : '#fff' }}
     >
       <span style={{ color: selected ? ORANGE : '#6B7280' }}>{icon}</span>
       <span className="text-sm font-semibold text-gray-900">{label}</span>
@@ -514,27 +401,16 @@ function PayMethodCard({
 }
 
 function DeliveryMethodCard({
-  selected,
-  onClick,
-  icon,
-  label,
-  sublabel,
+  selected, onClick, icon, label, sublabel,
 }: {
-  selected: boolean
-  onClick: () => void
-  icon: React.ReactNode
-  label: string
-  sublabel: string
+  selected: boolean; onClick: () => void; icon: React.ReactNode; label: string; sublabel: string
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className="flex flex-col items-start gap-1.5 p-3 rounded-xl border-2 text-left transition-all cursor-pointer"
-      style={{
-        borderColor: selected ? ORANGE : '#E5E7EB',
-        background: selected ? '#FDE8D8' : '#fff',
-      }}
+      style={{ borderColor: selected ? ORANGE : '#E5E7EB', background: selected ? '#FDE8D8' : '#fff' }}
     >
       <span style={{ color: selected ? ORANGE : '#6B7280' }}>{icon}</span>
       <span className="text-sm font-semibold text-gray-900">{label}</span>
@@ -544,19 +420,9 @@ function DeliveryMethodCard({
 }
 
 function Field({
-  label,
-  required = false,
-  type = 'text',
-  value,
-  onChange,
-  placeholder,
+  label, required = false, type = 'text', value, onChange, placeholder,
 }: {
-  label: string
-  required?: boolean
-  type?: string
-  value: string
-  onChange: (v: string) => void
-  placeholder?: string
+  label: string; required?: boolean; type?: string; value: string; onChange: (v: string) => void; placeholder?: string
 }) {
   const id = label.toLowerCase().replace(/\s+/g, '-')
   return (

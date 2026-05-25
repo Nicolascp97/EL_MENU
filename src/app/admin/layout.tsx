@@ -5,7 +5,7 @@ import AdminSidebar from './_components/AdminSidebar'
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/mayorista/login?next=/admin')
+  if (!user) redirect('/login?next=/admin')
 
   const { data: profile } = await supabase
     .from('profiles')

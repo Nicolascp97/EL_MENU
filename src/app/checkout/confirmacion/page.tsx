@@ -9,15 +9,50 @@ export const dynamic = 'force-dynamic'
 
 type SP = Promise<{ status?: string; orderId?: string }>
 
-export default async function ConfirmacionPage({ searchParams }: { searchParams: SP }) {
-  const params = await searchParams
-  const status = params.status ?? 'error'
-  const orderId = params.orderId
+/** Traduce el código de tipo de pago de Transbank a texto legible. */
+function traducirTipoPago(code: string | null | undefined): string {
+  switch (code) {
+    case 'VD': return 'Débito / Redcompra'
+    case 'VN': return 'Crédito — Sin cuotas'
+    case 'VC': return 'Crédito — Con cuotas'
+    case 'S2': return 'Crédito — 2 cuotas sin interés'
+    case 'SI': return 'Crédito — Sin interés'
+    case 'NC': return 'Crédito — N cuotas sin interés'
+    case 'P':  return 'Prepago'
+    default:   return code ?? '—'
+  }
+}
 
-  let order: Order | null = null
+function formatFecha(isoString: string | null | undefined): string {
+  if (!isoString) return '—'
+  try {
+    return new Date(isoString).toLocaleString('es-CL', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    })
+  } catch {
+    return isoString
+  }
+}
+
+export default async function ConfirmacionPage({ searchParams }: { searchParams: SP }) {
+  const params   = await searchParams
+  const status   = params.status ?? 'error'
+  const orderId  = params.orderId
+
+  // Extendemos el tipo con los campos Transbank opcionales
+  type OrderWithTbk = Order & {
+    transbank_authorization_code?: string | null
+    transbank_card_last4?: string | null
+    transbank_payment_type?: string | null
+    transbank_installments?: number | null
+    transbank_transaction_date?: string | null
+  }
+
+  let order: OrderWithTbk | null = null
   if (orderId) {
     const admin = createAdminClient()
-    const { data } = await admin.from('orders').select('*').eq('id', orderId).single<Order>()
+    const { data } = await admin.from('orders').select('*').eq('id', orderId).single<OrderWithTbk>()
     order = data
   }
 
@@ -25,11 +60,16 @@ export default async function ConfirmacionPage({ searchParams }: { searchParams:
   const isCancelled = status === 'cancelled'
   const isTransfer  = status === 'transfer'
 
+  // ¿Tiene datos de comprobante Transbank completos?
+  const hasReceipt = isSuccess && order?.transbank_authorization_code
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <main className="max-w-xl mx-auto px-4 py-12">
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+
+          {/* ── Ícono + título ── */}
           <div className="text-center">
             {isSuccess ? (
               <CheckCircle2 className="mx-auto text-emerald-600" size={72} strokeWidth={1.5} />
@@ -41,25 +81,41 @@ export default async function ConfirmacionPage({ searchParams }: { searchParams:
               <XCircle className="mx-auto text-rose-600" size={72} strokeWidth={1.5} />
             )}
             <h1 className="text-2xl md:text-3xl font-bold mt-4" style={{ fontFamily: 'var(--font-fraunces)' }}>
-              {isSuccess  && '¡Pedido confirmado!'}
-              {isTransfer && '¡Pedido recibido!'}
+              {isSuccess   && '¡Pedido confirmado!'}
+              {isTransfer  && '¡Pedido recibido!'}
               {isCancelled && 'Pago cancelado'}
               {!isSuccess && !isTransfer && !isCancelled && 'No pudimos procesar el pago'}
             </h1>
             <p className="text-gray-600 mt-2 text-sm">
-              {isSuccess  && 'Recibimos tu pedido y lo estamos preparando. Te avisamos por WhatsApp cuando salga el despacho.'}
-              {isTransfer && 'Ya estamos esperando tu transferencia. Envía el comprobante por WhatsApp para confirmar el despacho.'}
+              {isSuccess   && 'Recibimos tu pedido y lo estamos preparando. Te avisamos por WhatsApp cuando salga el despacho.'}
+              {isTransfer  && 'Ya estamos esperando tu transferencia. Envía el comprobante por WhatsApp para confirmar el despacho.'}
               {isCancelled && 'No se cobró nada. Podés volver al catálogo y reintentar cuando quieras.'}
-              {!isSuccess && !isTransfer && !isCancelled && 'No te cobraron nada. Probá de nuevo o contactanos si el problema persiste.'}
+              {!isSuccess && !isTransfer && !isCancelled && 'No te cobraron nada. Probá de nuevo o contáctanos si el problema persiste.'}
             </p>
           </div>
 
+          {/* ── Resumen del pedido ── */}
           {order && (
             <div className="mt-6 bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-gray-500">Número</span><span className="font-mono font-semibold">#{order.id.slice(0, 8)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Total</span><span className="font-semibold tabular-nums">{formatPrice(order.total)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Productos</span><span>{order.items.length}</span></div>
-              <div className="flex justify-between"><span className="text-gray-500">Despacho a</span><span className="text-right max-w-[60%]">{order.address}, {order.commune}</span></div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                Resumen del pedido
+              </p>
+              <div className="flex justify-between">
+                <span className="text-gray-500">N° de orden</span>
+                <span className="font-mono font-semibold">#{order.id.slice(0, 8).toUpperCase()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Total</span>
+                <span className="font-semibold tabular-nums">{formatPrice(order.total)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Productos</span>
+                <span>{order.items.length} ítem{order.items.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Despacho a</span>
+                <span className="text-right max-w-[60%]">{order.address}, {order.commune}</span>
+              </div>
               {isTransfer && (
                 <div className="flex justify-between pt-1 border-t border-gray-200">
                   <span className="text-gray-500">Método</span>
@@ -69,7 +125,46 @@ export default async function ConfirmacionPage({ searchParams }: { searchParams:
             </div>
           )}
 
-          {/* Instrucciones de transferencia */}
+          {/* ── Comprobante Transbank (requerido por Transbank para validación) ── */}
+          {hasReceipt && order && (
+            <div className="mt-4 bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2 text-sm">
+              <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-3">
+                Comprobante de pago Webpay
+              </p>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Código autorización</span>
+                <span className="font-mono font-bold text-emerald-800">
+                  {order.transbank_authorization_code}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Fecha y hora</span>
+                <span>{formatFecha(order.transbank_transaction_date)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Tipo de pago</span>
+                <span>{traducirTipoPago(order.transbank_payment_type)}</span>
+              </div>
+              {order.transbank_installments != null && order.transbank_installments > 1 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Cuotas</span>
+                  <span>{order.transbank_installments}</span>
+                </div>
+              )}
+              {order.transbank_card_last4 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Tarjeta</span>
+                  <span className="font-mono">**** **** **** {order.transbank_card_last4}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-emerald-200 pt-2 mt-1">
+                <span className="text-gray-500">Monto cobrado</span>
+                <span className="font-bold text-emerald-800">{formatPrice(order.total)}</span>
+              </div>
+            </div>
+          )}
+
+          {/* ── Instrucciones de transferencia ── */}
           {isTransfer && (
             <div className="mt-4 rounded-xl border border-orange-200 bg-orange-50 p-4 text-sm space-y-2">
               <p className="font-semibold text-orange-900">¿Cómo confirmar tu pedido?</p>
@@ -82,20 +177,13 @@ export default async function ConfirmacionPage({ searchParams }: { searchParams:
             </div>
           )}
 
+          {/* ── Botones de acción ── */}
           <div className="mt-6 flex flex-col gap-2">
-            {isSuccess && order && (
-              <Link
-                href={`/pedido/${order.id}`}
-                className="block w-full text-center px-4 py-3 rounded-full text-white text-sm font-semibold"
-                style={{ background: '#1B2B1E' }}
-              >
-                Ver detalle del pedido
-              </Link>
-            )}
-
             {isTransfer && (
               <a
-                href={`https://wa.me/56954952395?text=${encodeURIComponent(`Hola! Realicé el pedido #${order?.id?.slice(0, 8).toUpperCase() ?? ''} y adjunto el comprobante de transferencia.`)}`}
+                href={`https://wa.me/56954952395?text=${encodeURIComponent(
+                  `Hola! Realicé el pedido #${order?.id?.slice(0, 8).toUpperCase() ?? ''} y adjunto el comprobante de transferencia.`
+                )}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block w-full text-center inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-full text-sm font-semibold text-white"
@@ -108,11 +196,11 @@ export default async function ConfirmacionPage({ searchParams }: { searchParams:
             <Link
               href="/catalogo"
               className={`block w-full text-center px-4 py-3 rounded-full text-sm font-semibold ${
-                (isSuccess && order) || isTransfer
+                isSuccess || isTransfer
                   ? 'border border-gray-300 text-gray-800 hover:bg-gray-50'
                   : 'text-white'
               }`}
-              style={(isSuccess && order) || isTransfer ? undefined : { background: '#1B2B1E' }}
+              style={isSuccess || isTransfer ? undefined : { background: '#1B2B1E' }}
             >
               {isSuccess || isTransfer ? 'Seguir comprando' : 'Volver al catálogo'}
             </Link>
@@ -128,6 +216,7 @@ export default async function ConfirmacionPage({ searchParams }: { searchParams:
               </a>
             )}
           </div>
+
         </div>
       </main>
     </div>

@@ -1,6 +1,6 @@
 # El Menú — Estado del Proyecto
 
-> Última actualización: **2026-05-14** (Sesión completa: Meni IA, admin, step cards 3D, footer, polish final)
+> Última actualización: **2026-05-25** (Login admin independiente · Notificación WhatsApp en registro · UX confirmación con reenvío)
 > Stack: Next.js 16 (App Router, Turbopack) · TypeScript · Tailwind v4 · Supabase (PG + Auth + Storage + Realtime) · Anthropic Claude Sonnet 4.6 · Kie.ai · Remotion · Transbank Webpay · Vercel
 
 ---
@@ -118,6 +118,33 @@ El proyecto está al **99% del camino a producción**. Todo el código está ter
 - Eliminado el bloque "Pagamos con: Webpay · Khipu · Flow · Mercado Pago" del footer
 - Queda solo: `© 2026 El Menú SpA · Todos los derechos reservados`
 
+### 1.16 Login admin independiente ✅
+- **`/login`** — página oscura con branding El Menú, exclusiva para Celso/admin
+- No dice "mayoristas" ni nada confuso: dice "Panel de administración / Acceso exclusivo para el equipo interno"
+- `proxy.ts` y `admin/layout.tsx` redirigen a `/login` (ya no a `/mayorista/login`) cuando alguien intenta entrar a `/admin` sin sesión
+- Enlace discreto al final: "¿Eres cliente? Acceso mayoristas →" para que ningún cliente termine ahí por error
+- Celso puede acceder directo desde **cualquier URL**: `elmenu.cl/login`
+
+### 1.17 Notificación WhatsApp en cada nuevo registro ✅
+- **`/api/notify/registro`** — POST endpoint que envía WhatsApp a Celso via CallMeBot cuando alguien se registra
+- Mensaje incluye: nombre, correo, teléfono, tipo (mayorista/minorista) + "→ Agregar al CRM"
+- Se llama en background desde `registro/page.tsx` — si CallMeBot falla, el registro igual funciona
+- Si `CALLMEBOT_API_KEY` no está configurada aún, hace `console.log` para no romper nada
+
+### 1.18 Mejoras al flujo de registro ✅
+- Pantalla de confirmación rediseñada con botón **"¿No llegó? Reenviar correo"** (usa `supabase.auth.resend`)
+- Aviso explícito de revisar carpeta spam
+- Traduce error de rate-limit: "Demasiados intentos. Espera unos minutos."
+- El registro notifica a Celso **en el momento del signup** (no hay que esperar confirmación de email)
+
+### 1.19 Checkout limpiado — solo Transbank + Transferencia ✅
+- **Eliminados:** Amipass y Edenred de la UI de checkout (los archivos API quedan en el repo pero desconectados)
+- **Datos bancarios reales** integrados en el checkout:
+  - Verdulería El Menú SpA · RUT 77.190.604-4
+  - Banco Santander · Cuenta Corriente · 0-000-9399840-5
+  - verdurerias.elmenu@gmail.com
+- Sublabel del método de transferencia actualizado a "Banco Santander"
+
 ### 1.15 Deploy ✅
 - Repo en GitHub: `Nicolascp97/EL_MENU` · rama `master`
 - Vercel conectado con auto-deploy en push a master
@@ -143,16 +170,27 @@ El código está implementado. Solo falta activar el servicio:
 - [ ] Agregar en Vercel env vars + `TRANSBANK_ENVIRONMENT=production`
 - [ ] Probar flujo completo con tarjeta real en dominio live antes de anunciar
 
-#### Supabase Site URL
-- [ ] Supabase Dashboard → Authentication → URL Configuration → **Site URL** = dominio final
-- Sin esto, los links de confirmación de email apuntan a localhost
+#### ⚠️ Supabase Site URL — CRÍTICO para que el registro funcione
+- [ ] Supabase Dashboard → Authentication → URL Configuration → **Site URL**
+- **Ahora mismo apunta a localhost** → los links de confirmación de email no funcionan en producción
+- **Qué hacer YA (antes de lanzar):**
+  1. Ir a [Supabase Dashboard → Authentication → URL Configuration](https://supabase.com/dashboard/project/xneydkfzcveigmbtpltk/auth/url-configuration)
+  2. Cambiar **Site URL** a `https://www.el-menu.cl`
+  3. En **Redirect URLs** agregar también: `https://www.el-menu.cl/**` y `https://*.vercel.app/**`
+- Sin este cambio, los usuarios que se registren NO podrán confirmar su email
+
+#### ⚠️ Variable de entorno `NEXT_PUBLIC_APP_URL`
+- [ ] Vercel → Settings → Environment Variables → `NEXT_PUBLIC_APP_URL = https://www.el-menu.cl`
+- Esta variable se usa en las redirecciones de Transbank (return URL) y en links de correos
 
 #### Dominio
-- [ ] Apuntar `elmenu.cl` a Vercel (DNS → CNAME a `cname.vercel-dns.com`)
-- [ ] Vercel → Settings → Domains → agregar dominio
+- El dominio definitivo es **`www.el-menu.cl`** (con guión)
+- [ ] Apuntar `www.el-menu.cl` a Vercel (DNS → CNAME `www` → `cname.vercel-dns.com`)
+- [ ] Vercel → Settings → Domains → agregar `www.el-menu.cl`
+- [ ] Verificar también redirigir `el-menu.cl` (sin www) a `www.el-menu.cl`
 
 ### 2.2 Pendientes técnicos menores
-- [ ] **`CRON_SECRET`** en Vercel env vars (sin esto el cron de recetas falla con 401)
+- [x] **`CRON_SECRET`** en Vercel env vars ✅
 - [ ] **Loading states** en `/catalogo` y `/mayorista` (Suspense + skeleton)
 - [ ] **Analytics** (Vercel Analytics — 1 línea de código)
 - [ ] **Emails transaccionales** (Resend) — orden confirmada al cliente (opcional para MVP)
@@ -168,7 +206,7 @@ El código está implementado. Solo falta activar el servicio:
 ## 3. Checklist pre-lanzamiento
 
 ### 3.1 Supabase
-- [ ] Auth → **Site URL** = dominio final
+- [ ] Auth → **Site URL** = `https://www.el-menu.cl`
 - [ ] Auth → Confirm email: ON (seguro) o OFF (más ágil para lanzamiento)
 - [ ] Settings → Database → Backups: daily backup habilitado
 
@@ -197,8 +235,8 @@ UPDATE profiles SET role = 'admin' WHERE id = (
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role (server) | ✅ |
 | `ANTHROPIC_API_KEY` | Claude API para Meni | ✅ en uso |
 | `NEXT_PUBLIC_WA_NUMBER` | WhatsApp Celso (`56954952395`) | ✅ |
-| `NEXT_PUBLIC_APP_URL` | URL base de la app | ✅ |
-| `CRON_SECRET` | Bearer para `/api/cron/*` | ⏳ agregar en Vercel |
+| `NEXT_PUBLIC_APP_URL` | URL base = `https://www.el-menu.cl` | ✅ |
+| `CRON_SECRET` | Bearer para `/api/cron/*` | ✅ |
 | `CALLMEBOT_API_KEY` | Notificaciones WhatsApp al local | ⏳ pendiente activación |
 | `TRANSBANK_ENVIRONMENT` | `integration` dev / `production` prod | ⏳ cambiar a production |
 | `TRANSBANK_COMMERCE_CODE` | Código comercio producción | ⏳ Celso lo entrega |

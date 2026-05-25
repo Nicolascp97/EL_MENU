@@ -20,9 +20,23 @@ type OrderRow = {
   items: { product_name: string; qty: number; unit: string }[]
 }
 
+/** Traduce el código de tipo de pago de Transbank a texto legible. */
+function traducirTipoPago(code: string | undefined): string {
+  switch (code) {
+    case 'VD': return 'Débito / Redcompra'
+    case 'VN': return 'Crédito — Sin cuotas'
+    case 'VC': return 'Crédito — Con cuotas'
+    case 'S2': return 'Crédito — 2 cuotas sin interés'
+    case 'SI': return 'Crédito — Sin interés'
+    case 'NC': return 'Crédito — N cuotas sin interés'
+    case 'P':  return 'Prepago'
+    default:   return code ?? 'Tarjeta'
+  }
+}
+
 async function notifyWhatsApp(order: OrderRow) {
   const apiKey = process.env.CALLMEBOT_API_KEY
-  const phone = process.env.NEXT_PUBLIC_WA_NUMBER
+  const phone  = process.env.NEXT_PUBLIC_WA_NUMBER
   if (!apiKey || !phone) return
 
   const itemLines = (order.items ?? [])
@@ -60,21 +74,22 @@ async function handleReturn(req: Request): Promise<Response> {
     return NextResponse.json({ error: 'Configuración del servidor incompleta.' }, { status: 500 })
   }
 
-  let tokenWs: string | null = null
+  let tokenWs:  string | null = null
   let tbkToken: string | null = null
 
   if (req.method === 'POST') {
     const form = await req.formData()
-    tokenWs = (form.get('token_ws') as string) ?? null
+    tokenWs  = (form.get('token_ws') as string) ?? null
     tbkToken = (form.get('TBK_TOKEN') as string) ?? null
   } else {
     const url = new URL(req.url)
-    tokenWs = url.searchParams.get('token_ws')
+    tokenWs  = url.searchParams.get('token_ws')
     tbkToken = url.searchParams.get('TBK_TOKEN')
   }
 
   const admin = createAdminClient()
 
+  // ── Cancelado por el usuario ─────────────────────────────────
   if (tbkToken && !tokenWs) {
     const { data: order } = await admin
       .from('orders')
@@ -112,7 +127,7 @@ async function handleReturn(req: Request): Promise<Response> {
       )
     }
 
-    const tx = createWebpayPlus()
+    const tx     = createWebpayPlus()
     const result = await tx.commit(tokenWs)
 
     const authorized =
@@ -128,12 +143,26 @@ async function handleReturn(req: Request): Promise<Response> {
       return NextResponse.redirect(`${appUrl}/checkout/confirmacion?status=error`, { status: 303 })
     }
 
-    // 3. Actualizar solo si sigue pendiente (guard idempotencia)
+    // 3. Extraer datos del comprobante (requeridos por Transbank para validación)
+    const cardLast4 = result?.card_detail?.card_number
+      ? String(result.card_detail.card_number).slice(-4)
+      : null
+
+    const transbankFields = authorized ? {
+      transbank_authorization_code: result.authorization_code ?? null,
+      transbank_card_last4:         cardLast4,
+      transbank_payment_type:       result.payment_type_code ?? null,
+      transbank_installments:       result.installments_number ?? 0,
+      transbank_transaction_date:   result.transaction_date ?? null,
+    } : {}
+
+    // 4. Actualizar solo si sigue pendiente (guard idempotencia)
     const { data: order } = await admin
       .from('orders')
       .update({
         payment_status: authorized ? 'pagado' : 'fallido',
-        status: authorized ? 'nuevo' : 'cancelado',
+        status:         authorized ? 'nuevo'  : 'cancelado',
+        ...transbankFields,
       })
       .eq('transbank_token', tokenWs)
       .eq('payment_status', 'pendiente')
