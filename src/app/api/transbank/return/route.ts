@@ -205,10 +205,10 @@ async function handleReturn(req: Request): Promise<Response> {
           .select('name, stock, unit')
           .in('id', productIds)
           .lte('stock', 5)
-          .then(({ data }) => {
-            if (data?.length) notifyStockBajo(data).catch(() => {})
-          })
-          .catch(() => {})
+          .then(
+            ({ data }) => { if (data?.length) notifyStockBajo(data).catch(() => {}) },
+            () => {}
+          )
       }
     }
 

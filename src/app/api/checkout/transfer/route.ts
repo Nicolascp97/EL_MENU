@@ -187,10 +187,10 @@ export async function POST(req: NextRequest) {
     .select('name, stock, unit')
     .in('id', updatedIds)
     .lte('stock', 5)
-    .then(({ data }) => {
-      if (data?.length) notifyStockBajo(data).catch(() => {})
-    })
-    .catch(() => {})
+    .then(
+      ({ data }) => { if (data?.length) notifyStockBajo(data).catch(() => {}) },
+      () => {}
+    )
 
   return NextResponse.json({ ok: true, orderId: order.id })
 }

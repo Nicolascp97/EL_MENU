@@ -309,7 +309,7 @@ export default function MayoristasAdminClient() {
             onClick={() => setTab(t.key as any)}
             style={{
               display: 'flex', alignItems: 'center', gap: 7,
-              padding: '9px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
+              padding: '9px 16px', borderRadius: 10, cursor: 'pointer',
               background: tab === t.key ? GREEN : '#fff',
               color: tab === t.key ? '#fff' : '#4A6350',
               fontWeight: tab === t.key ? 700 : 500,
