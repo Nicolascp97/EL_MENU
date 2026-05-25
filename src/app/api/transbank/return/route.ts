@@ -186,5 +186,6 @@ async function handleReturn(req: Request): Promise<Response> {
   }
 }
 
+// Transbank usa POST en producción, pero en integración puede redirigir con GET
 export const POST = handleReturn
-// GET eliminado: Transbank usa solo POST para el callback
+export const GET  = handleReturn
