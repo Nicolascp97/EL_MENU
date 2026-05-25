@@ -309,18 +309,25 @@ elmenu-app/
 
 ---
 
-## 6. Cómo probar checkout end-to-end (dev local)
+## 6. Cómo probar checkout end-to-end
 
-1. `npm run dev` → `http://localhost:3000/catalogo`
+1. Ir a **https://www.el-menu.cl/catalogo** (o `npm run dev` → `http://localhost:3000/catalogo`)
 2. Agregar productos por al menos **$20.000**
-3. Carrito → Pagar → `/checkout` → completar form
-4. Tarjeta de integración Transbank:
-   - **Número:** `4051 8856 0000 0044`
-   - **CVV:** `123` · **Venc:** `11/27` · **RUT:** `11.111.111-1` · **Clave:** `123`
-5. Confirmación → `/checkout/confirmacion?status=success`
+3. Carrito → Pagar → `/checkout` → completar form → elegir Webpay
+4. Tarjetas de integración Transbank (actualizadas 2025):
 
-Para cancelación: "Anular compra" en Transbank → `status=cancelled`
-Para error: CVV `000` → `status=failed`
+| Tipo | Número | CVV | Resultado |
+|---|---|---|---|
+| VISA crédito ✅ | `4051 8856 0044 6623` | `123` exp `11/27` | Aprobada |
+| Redcompra ✅ | `4051 8842 3993 7763` | cualquiera | Aprobada |
+| AMEX ✅ | `3700 0000 0002 032` | `1234` | Aprobada |
+| Mastercard ❌ | `5186 0595 5959 0568` | `123` | Rechazada |
+
+   - **RUT:** `11.111.111-1` · **Clave web:** `123`
+
+5. Confirmación → `/checkout/confirmacion?status=success` con comprobante completo
+
+Para cancelación: clic "Anular compra" en Transbank → `status=cancelled`
 
 ---
 
