@@ -20,6 +20,7 @@ export default function UserMenu({ className = '', compact = false }: Props) {
   const [snap, setSnap] = useState<Snap>(null)
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [alignLeft, setAlignLeft] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -63,6 +64,15 @@ export default function UserMenu({ className = '', compact = false }: Props) {
 
   useEffect(() => {
     if (!open) return
+
+    // Medir posición del botón y decidir si abrir hacia la izquierda o derecha
+    if (wrapRef.current) {
+      const { right } = wrapRef.current.getBoundingClientRect()
+      // Si hay menos de 272px a la izquierda del borde derecho del botón,
+      // el dropdown de 256px saldría de pantalla → abrir hacia la derecha (left-0)
+      setAlignLeft(right < 272)
+    }
+
     function onClickOutside(e: MouseEvent) {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
     }
@@ -123,7 +133,7 @@ export default function UserMenu({ className = '', compact = false }: Props) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-gray-200 bg-white shadow-xl z-[60] overflow-hidden"
+          className={`absolute top-full mt-2 w-64 max-w-[calc(100vw-1rem)] rounded-2xl border border-gray-200 bg-white shadow-xl z-[60] overflow-hidden ${alignLeft ? 'left-0' : 'right-0'}`}
         >
           <div className="px-4 py-3 border-b border-gray-100">
             <div className="flex items-center gap-3">
