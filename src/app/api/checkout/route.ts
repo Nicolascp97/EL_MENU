@@ -81,13 +81,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No pude consultar los productos.' }, { status: 500 })
   }
 
-  const { data: zone } = await admin
-    .from('zones')
-    .select('*')
-    .contains('communes', [body.commune])
-    .maybeSingle()
-  if (!zone) {
-    return NextResponse.json({ error: `No despachamos a ${body.commune} todavía.` }, { status: 400 })
+  // Retiro en tienda: no requiere zona ni despacho
+  const isPickup = body.commune === 'Retiro en tienda' && body.address === 'Retiro en tienda'
+
+  let zone: { delivery_price: number; min_order: number; min_order_wholesale: number } | null = null
+  if (!isPickup) {
+    const { data: zoneData } = await admin
+      .from('zones')
+      .select('*')
+      .contains('communes', [body.commune])
+      .maybeSingle()
+    if (!zoneData) {
+      return NextResponse.json({ error: `No despachamos a ${body.commune} todavía.` }, { status: 400 })
+    }
+    zone = zoneData
   }
 
   const orderItems: OrderItem[] = []
@@ -123,15 +130,17 @@ export async function POST(req: NextRequest) {
     subtotal += unitPrice * qty
   }
 
-  const minOrder = useWholesale ? zone.min_order_wholesale : zone.min_order
-  if (subtotal < minOrder) {
-    const falta = minOrder - subtotal
-    return NextResponse.json({
-      error: `Pedido mínimo $${minOrder.toLocaleString('es-CL')}. Te faltan $${falta.toLocaleString('es-CL')}.`,
-    }, { status: 400 })
+  if (zone) {
+    const minOrder = useWholesale ? zone.min_order_wholesale : zone.min_order
+    if (subtotal < minOrder) {
+      const falta = minOrder - subtotal
+      return NextResponse.json({
+        error: `Pedido mínimo $${minOrder.toLocaleString('es-CL')}. Te faltan $${falta.toLocaleString('es-CL')}.`,
+      }, { status: 400 })
+    }
   }
 
-  const total = subtotal + zone.delivery_price
+  const total = subtotal + (zone?.delivery_price ?? 0)
 
   const { data: order, error: oErr } = await admin
     .from('orders')
