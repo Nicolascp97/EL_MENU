@@ -90,7 +90,7 @@ export default function LoginAdminPage() {
                 border: '1px solid #2E4A32',
                 color: 'white',
               }}
-              placeholder="admin@elmenu.cl"
+              placeholder="verdurerias.elmenu@gmail.com"
             />
           </div>
 
