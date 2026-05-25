@@ -35,7 +35,7 @@ export type Zone = {
 export type OrderStatus = 'nuevo' | 'preparando' | 'listo' | 'en_camino' | 'entregado' | 'cancelado'
 export type OrderChannel = 'web' | 'whatsapp'
 export type PaymentStatus = 'pendiente' | 'pagado' | 'fallido'
-export type PaymentMethod = 'webpay' | 'transfer' | 'amipass' | 'edenred'
+export type PaymentMethod = 'webpay' | 'transfer'
 export type UserRole = 'minorista' | 'mayorista' | 'admin'
 export type RecipeDifficulty = 'Fácil' | 'Medio' | 'Difícil'
 

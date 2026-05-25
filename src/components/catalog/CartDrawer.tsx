@@ -157,7 +157,7 @@ export default function CartDrawer() {
                 onClick={() => setPaymentMethod('transfer')}
                 icon={<Banknote size={13} />}
                 label="Transferencia"
-                sub="Datos al confirmar"
+                sub="Banco Santander"
               />
             </div>
 

@@ -10,7 +10,7 @@ type SearchParams = Promise<{ delivery?: string; payment?: string }>
 export default async function CheckoutPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
   const initialDelivery = params.delivery === 'tienda' ? 'tienda' : 'domicilio'
-  const validPayments = ['webpay', 'transfer', 'amipass', 'edenred'] as const
+  const validPayments = ['webpay', 'transfer'] as const
   type ValidPayment = typeof validPayments[number]
   const initialPayment: ValidPayment = validPayments.includes(params.payment as ValidPayment)
     ? (params.payment as ValidPayment)
