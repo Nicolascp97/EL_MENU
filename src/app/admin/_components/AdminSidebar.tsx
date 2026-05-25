@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ShoppingBag, Package, MapPin, ChefHat, LogOut, ExternalLink } from 'lucide-react'
+import { ShoppingBag, Package, MapPin, ChefHat, LogOut, Store } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const NAV = [
@@ -9,6 +9,7 @@ const NAV = [
   { href: '/admin/productos', label: 'Productos', icon: Package },
   { href: '/admin/zonas', label: 'Zonas', icon: MapPin },
   { href: '/admin/recetas', label: 'Recetas IA', icon: ChefHat },
+  { href: '/catalogo', label: 'Catálogo', icon: Store, exact: false },
 ]
 
 export default function AdminSidebar({ userEmail }: { userEmail: string }) {
@@ -57,7 +58,9 @@ export default function AdminSidebar({ userEmail }: { userEmail: string }) {
         {/* Nav */}
         <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {NAV.map(({ href, label, icon: Icon, exact }) => {
-            const active = isActive(href, exact)
+            // El link al catálogo nunca se marca como activo dentro del admin
+            const active = href.startsWith('/admin') ? isActive(href, exact) : false
+            const isCatalog = href === '/catalogo'
             return (
               <Link
                 key={href}
@@ -65,9 +68,12 @@ export default function AdminSidebar({ userEmail }: { userEmail: string }) {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '10px 12px', borderRadius: 10,
+                  marginTop: isCatalog ? 8 : 0,
+                  borderTop: isCatalog ? '1px solid rgba(255,255,255,.06)' : 'none',
+                  paddingTop: isCatalog ? 18 : 10,
                   background: active ? '#fff' : 'transparent',
-                  color: active ? '#1B2B1E' : '#8DB89A',
-                  fontWeight: active ? 600 : 400, fontSize: 14,
+                  color: active ? '#1B2B1E' : isCatalog ? '#A8C5A0' : '#8DB89A',
+                  fontWeight: active ? 600 : isCatalog ? 500 : 400, fontSize: 14,
                   textDecoration: 'none', transition: 'background .12s, color .12s',
                 }}
               >
@@ -92,30 +98,17 @@ export default function AdminSidebar({ userEmail }: { userEmail: string }) {
               {userEmail}
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <Link
-              href="/"
-              style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                padding: '8px 0', borderRadius: 8, border: '1px solid rgba(255,255,255,.1)',
-                color: '#8DB89A', fontSize: 12, textDecoration: 'none',
-              }}
-            >
-              <ExternalLink size={12} />
-              Ver sitio
-            </Link>
-            <button
-              onClick={signOut}
-              style={{
-                flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                padding: '8px 0', borderRadius: 8, border: '1px solid rgba(255,255,255,.1)',
-                color: '#8DB89A', fontSize: 12, background: 'transparent', cursor: 'pointer',
-              }}
-            >
-              <LogOut size={12} />
-              Salir
-            </button>
-          </div>
+          <button
+            onClick={signOut}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              padding: '8px 0', borderRadius: 8, border: '1px solid rgba(255,255,255,.1)',
+              color: '#8DB89A', fontSize: 12, background: 'transparent', cursor: 'pointer',
+            }}
+          >
+            <LogOut size={12} />
+            Cerrar sesión
+          </button>
         </div>
       </aside>
 
