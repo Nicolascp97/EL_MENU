@@ -1,8 +1,18 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Order, OrderStatus } from '@/types/database'
 import { formatPrice } from '@/lib/utils'
+
+// ─── Tipos para solicitudes mayoristas ───────────────────────────────────────
+type MayoristaRequest = {
+  id:         string
+  name:       string
+  email:      string
+  phone:      string | null
+  created_at: string
+  hasProfile: boolean
+}
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
   nuevo: 'Nuevo',
@@ -36,10 +46,45 @@ function isToday(dateStr: string) {
 }
 
 export default function OrdersRealtimeClient({ initialOrders }: Props) {
-  const [orders, setOrders] = useState<Order[]>(initialOrders)
-  const [updating, setUpdating] = useState<string | null>(null)
+  const [orders,    setOrders]    = useState<Order[]>(initialOrders)
+  const [updating,  setUpdating]  = useState<string | null>(null)
   const [notifState, setNotifState] = useState<NotificationPermission>('default')
   const supabase = createClient()
+
+  // ── Mayoristas pendientes ──────────────────────────────────────────────────
+  const [mayoristas,       setMayoristas]       = useState<MayoristaRequest[]>([])
+  const [mayoristaLoading, setMayoristaLoading] = useState(true)
+  const [mayoristaAction,  setMayoristaAction]  = useState<string | null>(null)
+  const [mayoristaToast,   setMayoristaToast]   = useState<string | null>(null)
+  const [expanded,         setExpanded]         = useState(false)
+
+  const loadMayoristas = useCallback(async () => {
+    const res = await fetch('/api/admin/mayoristas')
+    if (res.ok) {
+      const data = await res.json()
+      setMayoristas(data.pending ?? [])
+      // Auto-expandir si hay pendientes
+      if ((data.pending ?? []).length > 0) setExpanded(true)
+    }
+    setMayoristaLoading(false)
+  }, [])
+
+  useEffect(() => { loadMayoristas() }, [loadMayoristas])
+
+  async function handleMayoristaAction(userId: string, action: 'approve' | 'reject') {
+    setMayoristaAction(userId + action)
+    const res = await fetch('/api/admin/mayoristas', {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ userId, action }),
+    })
+    setMayoristaAction(null)
+    if (res.ok) {
+      setMayoristaToast(action === 'approve' ? '✅ Mayorista aprobado' : '❌ Solicitud rechazada')
+      setTimeout(() => setMayoristaToast(null), 3500)
+      await loadMayoristas()
+    }
+  }
 
   useEffect(() => {
     if ('Notification' in window) setNotifState(Notification.permission)
@@ -126,6 +171,117 @@ export default function OrdersRealtimeClient({ initialOrders }: Props) {
           </button>
         )}
       </div>
+
+      {/* ── Toast mayorista ───────────────────────────────────────── */}
+      {mayoristaToast && (
+        <div style={{
+          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
+          background: mayoristaToast.startsWith('✅') ? '#166534' : '#991B1B',
+          color: '#fff', padding: '12px 20px', borderRadius: 12,
+          fontWeight: 600, fontSize: 14, zIndex: 999,
+          boxShadow: '0 4px 20px rgba(0,0,0,.25)',
+        }}>
+          {mayoristaToast}
+        </div>
+      )}
+
+      {/* ── Solicitudes mayoristas pendientes ─────────────────────── */}
+      {!mayoristaLoading && mayoristas.length > 0 && (
+        <div style={{
+          background: '#FFF8F3',
+          border: '1.5px solid #E8621A',
+          borderRadius: 14,
+          marginBottom: 24,
+          overflow: 'hidden',
+        }}>
+          {/* Header del bloque */}
+          <button
+            onClick={() => setExpanded(e => !e)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+              padding: '14px 20px', background: 'transparent', border: 'none',
+              cursor: 'pointer', textAlign: 'left',
+            }}
+          >
+            <span style={{ fontSize: 20 }}>🏢</span>
+            <span style={{ fontWeight: 700, fontSize: 15, color: '#1B2B1E', flex: 1 }}>
+              {mayoristas.length} solicitud{mayoristas.length > 1 ? 'es' : ''} mayorista pendiente{mayoristas.length > 1 ? 's' : ''}
+            </span>
+            <span style={{
+              background: '#E8621A', color: '#fff',
+              fontSize: 12, fontWeight: 800,
+              padding: '3px 10px', borderRadius: 99,
+            }}>
+              {mayoristas.length}
+            </span>
+            <span style={{ color: '#E8621A', fontSize: 18, fontWeight: 700 }}>
+              {expanded ? '▲' : '▼'}
+            </span>
+          </button>
+
+          {/* Lista de solicitudes */}
+          {expanded && (
+            <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {mayoristas.map(m => {
+                const isLoading = mayoristaAction?.startsWith(m.id)
+                return (
+                  <div key={m.id} style={{
+                    background: '#fff',
+                    border: '1px solid #FDDCCC',
+                    borderRadius: 10,
+                    padding: '14px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                  }}>
+                    {/* Info */}
+                    <div style={{ flex: 1, minWidth: 180 }}>
+                      <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: '#1B2B1E' }}>{m.name}</p>
+                      <p style={{ margin: '2px 0 0', fontSize: 12, color: '#6B7A6F' }}>{m.email}</p>
+                      {m.phone && (
+                        <p style={{ margin: '1px 0 0', fontSize: 12, color: '#6B7A6F' }}>{m.phone}</p>
+                      )}
+                    </div>
+                    {/* Fecha */}
+                    <p style={{ margin: 0, fontSize: 11, color: '#9DC4AA', whiteSpace: 'nowrap' }}>
+                      {new Date(m.created_at).toLocaleDateString('es-CL', { day: '2-digit', month: 'short' })}
+                    </p>
+                    {/* Botones */}
+                    <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                      <button
+                        onClick={() => handleMayoristaAction(m.id, 'approve')}
+                        disabled={!!isLoading}
+                        style={{
+                          padding: '8px 14px', borderRadius: 8, border: 'none',
+                          background: '#166534', color: '#fff',
+                          fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                          opacity: isLoading ? .6 : 1,
+                          display: 'flex', alignItems: 'center', gap: 5,
+                        }}
+                      >
+                        ✅ {isLoading && mayoristaAction === m.id + 'approve' ? '...' : 'Aprobar'}
+                      </button>
+                      <button
+                        onClick={() => handleMayoristaAction(m.id, 'reject')}
+                        disabled={!!isLoading}
+                        style={{
+                          padding: '8px 12px', borderRadius: 8,
+                          border: '1px solid #FECACA', background: '#FFF5F5',
+                          color: '#991B1B', fontWeight: 600, fontSize: 13,
+                          cursor: 'pointer', opacity: isLoading ? .6 : 1,
+                        }}
+                      >
+                        {isLoading && mayoristaAction === m.id + 'reject' ? '...' : '❌'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* KPI Strip */}
       <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>

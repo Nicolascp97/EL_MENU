@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { notifyMayoristaAprobado } from '@/lib/notify'
 
 /** Verifica que el caller sea admin. */
 async function verifyAdmin() {
@@ -174,6 +175,15 @@ export async function PATCH(req: Request) {
     await admin.auth.admin.updateUserById(userId, {
       user_metadata: { mayorista_requested: false },
     })
+
+    // Notificar a Celso que la aprobación fue exitosa
+    const { data: authUser } = await admin.auth.admin.getUserById(userId)
+    if (authUser.user) {
+      notifyMayoristaAprobado({
+        name:  nameFromUser(authUser.user),
+        email: authUser.user.email ?? '',
+      }).catch(() => {})
+    }
 
   } else {
     // Rechazar: solo limpiar el flag

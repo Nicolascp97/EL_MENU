@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createWebpayPlus } from '@/lib/transbank'
+import { notifyPedidoWebpay, notifyStockBajo } from '@/lib/notify'
 
 /**
  * Endpoint de retorno que Transbank invoca después del flujo de pago.
@@ -24,6 +25,8 @@ type OrderRow = {
   items: { product_name: string; qty: number; unit: string }[]
 }
 
+type OrderRowWithItems = OrderRow & { items: { product_id?: string; product_name: string; qty: number; unit: string }[] }
+
 /** Traduce el código de tipo de pago de Transbank a texto legible. */
 function traducirTipoPago(code: string | undefined): string {
   switch (code) {
@@ -38,38 +41,6 @@ function traducirTipoPago(code: string | undefined): string {
   }
 }
 
-async function notifyWhatsApp(order: OrderRow) {
-  const apiKey = process.env.CALLMEBOT_API_KEY
-  const phone  = process.env.NEXT_PUBLIC_WA_NUMBER
-  if (!apiKey || !phone) return
-
-  const itemLines = (order.items ?? [])
-    .slice(0, 4)
-    .map(i => `• ${i.product_name} x${i.qty} ${i.unit}`)
-    .join('\n')
-  const extra = order.items.length > 4 ? `\n+${order.items.length - 4} productos más` : ''
-
-  const msg = [
-    `🥦 NUEVO PEDIDO El Menú`,
-    `#${order.id.slice(0, 8).toUpperCase()}`,
-    `💰 $${order.total.toLocaleString('es-CL')}`,
-    `📱 ${order.phone}`,
-    `📍 ${order.commune} — ${order.address}`,
-    ``,
-    itemLines + extra,
-  ].join('\n')
-
-  const url = `https://api.callmebot.com/whatsapp.php?phone=${phone}&text=${encodeURIComponent(msg)}&apikey=${apiKey}`
-  const controller = new AbortController()
-  const id = setTimeout(() => controller.abort(), 5000)
-  try {
-    await fetch(url, { signal: controller.signal })
-  } catch {
-    // Ignorar errores de notificación (no críticos)
-  } finally {
-    clearTimeout(id)
-  }
-}
 
 async function handleReturn(req: Request): Promise<Response> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL
@@ -222,7 +193,23 @@ async function handleReturn(req: Request): Promise<Response> {
       .maybeSingle()
 
     if (authorized && order) {
-      notifyWhatsApp(order as OrderRow).catch(() => {})
+      notifyPedidoWebpay(order as OrderRow).catch(() => {})
+
+      // Alerta de stock bajo: productos con ≤5 unidades tras el pedido
+      const productIds = (order.items as { product_id?: string }[])
+        .map(i => i.product_id)
+        .filter(Boolean) as string[]
+
+      if (productIds.length) {
+        admin.from('products')
+          .select('name, stock, unit')
+          .in('id', productIds)
+          .lte('stock', 5)
+          .then(({ data }) => {
+            if (data?.length) notifyStockBajo(data).catch(() => {})
+          })
+          .catch(() => {})
+      }
     }
 
     return NextResponse.redirect(

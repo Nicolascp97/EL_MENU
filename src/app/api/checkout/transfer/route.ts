@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { checkOrigin } from '@/lib/csrf'
+import { notifyPedidoTransferencia, notifyStockBajo } from '@/lib/notify'
 import type { UserRole, OrderItem } from '@/types/database'
 
 type Body = {
@@ -11,15 +12,6 @@ type Body = {
   phone: string
   name: string
   notes?: string
-}
-
-type OrderRow = {
-  id: string
-  total: number
-  phone: string
-  commune: string
-  address: string
-  items: { product_name: string; qty: number; unit: string }[]
 }
 
 // Rate limiting: máx 3 órdenes transfer/hora/IP
@@ -37,39 +29,6 @@ function checkTransferRateLimit(ip: string): boolean {
   return true
 }
 
-async function notifyWhatsApp(order: OrderRow) {
-  const apiKey = process.env.CALLMEBOT_API_KEY
-  const waNumber = process.env.NEXT_PUBLIC_WA_NUMBER
-  if (!apiKey || !waNumber) return
-
-  const itemLines = (order.items ?? [])
-    .slice(0, 4)
-    .map(i => `• ${i.product_name} x${i.qty} ${i.unit}`)
-    .join('\n')
-  const extra = order.items.length > 4 ? `\n+${order.items.length - 4} productos más` : ''
-
-  const msg = [
-    `🥦 PEDIDO POR TRANSFERENCIA — El Menú`,
-    `#${order.id.slice(0, 8).toUpperCase()}`,
-    `💰 $${order.total.toLocaleString('es-CL')}`,
-    `📱 ${order.phone}`,
-    `📍 ${order.commune} — ${order.address}`,
-    `⚠️ Pendiente de confirmación de pago`,
-    ``,
-    itemLines + extra,
-  ].join('\n')
-
-  const url = `https://api.callmebot.com/whatsapp.php?phone=${waNumber}&text=${encodeURIComponent(msg)}&apikey=${apiKey}`
-  const controller = new AbortController()
-  const id = setTimeout(() => controller.abort(), 5000)
-  try {
-    await fetch(url, { signal: controller.signal })
-  } catch {
-    // Ignorar errores de notificación (no críticos)
-  } finally {
-    clearTimeout(id)
-  }
-}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_ITEMS = 50
@@ -219,7 +178,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No pude crear el pedido.' }, { status: 500 })
   }
 
-  notifyWhatsApp(order as OrderRow).catch(() => {})
+  // Notificar nuevo pedido
+  notifyPedidoTransferencia(order).catch(() => {})
+
+  // Alerta de stock bajo: productos con ≤5 unidades después del pedido
+  const updatedIds = orderItems.map(i => i.product_id)
+  admin.from('products')
+    .select('name, stock, unit')
+    .in('id', updatedIds)
+    .lte('stock', 5)
+    .then(({ data }) => {
+      if (data?.length) notifyStockBajo(data).catch(() => {})
+    })
+    .catch(() => {})
 
   return NextResponse.json({ ok: true, orderId: order.id })
 }
