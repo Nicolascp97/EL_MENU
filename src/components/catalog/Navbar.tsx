@@ -16,19 +16,24 @@ export default function Navbar() {
   const prevCountRef = useRef<number | null>(null)
   useEffect(() => setMounted(true), [])
 
-  // Verificar si el usuario es admin para mostrar el link en el menú mobile
+  // Detectar rol admin usando onAuthStateChange que dispara inmediatamente
+  // con la sesión en localStorage — sin esperar llamada de red extra.
   useEffect(() => {
     const supabase = createClient()
     let active = true
-    async function checkAdmin() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!active || !user) return
+
+    async function checkAdmin(userId: string) {
       const { data: profile } = await supabase
-        .from('profiles').select('role').eq('id', user.id).single()
+        .from('profiles').select('role').eq('id', userId).single()
       if (active) setIsAdmin(profile?.role === 'admin')
     }
-    checkAdmin()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => checkAdmin())
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return
+      if (session?.user) checkAdmin(session.user.id)
+      else setIsAdmin(false)
+    })
+
     return () => { active = false; subscription.unsubscribe() }
   }, [])
   const itemCount = mounted ? items.reduce((sum, i) => sum + i.qty, 0) : 0
