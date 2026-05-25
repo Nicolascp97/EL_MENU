@@ -6,9 +6,13 @@ import { createWebpayPlus } from '@/lib/transbank'
  * Endpoint de retorno que Transbank invoca después del flujo de pago.
  *
  * Casos posibles:
- * 1. Pago completado → form POST con `token_ws`.
- * 2. Pago cancelado por el usuario → form POST con `TBK_TOKEN`.
- * 3. Timeout o error → puede llegar GET con TBK_TOKEN/TBK_ORDEN_COMPRA.
+ * 1. Pago completado              → form POST con `token_ws` (sin TBK_TOKEN).
+ * 2. Pago cancelado por el usuario→ form POST con `TBK_TOKEN` (sin token_ws).
+ * 3. Error en formulario de pago  → llegan AMBOS: token_ws + TBK_TOKEN.
+ *    (usuario hizo click en "intentar nuevamente" tras error de pantalla)
+ *    → NO hacer commit; marcar como fallido.
+ * 4. Timeout (>5 min sin acción)  → llega solo TBK_ORDEN_COMPRA + TBK_ID_SESION.
+ *    → buscar orden por buy_order y marcar como cancelado.
  */
 
 type OrderRow = {
@@ -27,8 +31,8 @@ function traducirTipoPago(code: string | undefined): string {
     case 'VN': return 'Crédito — Sin cuotas'
     case 'VC': return 'Crédito — Con cuotas'
     case 'S2': return 'Crédito — 2 cuotas sin interés'
-    case 'SI': return 'Crédito — Sin interés'
-    case 'NC': return 'Crédito — N cuotas sin interés'
+    case 'SI': return 'Sin interés'
+    case 'NC': return 'N cuotas sin interés'
     case 'P':  return 'Prepago'
     default:   return code ?? 'Tarjeta'
   }
@@ -76,20 +80,36 @@ async function handleReturn(req: Request): Promise<Response> {
 
   let tokenWs:  string | null = null
   let tbkToken: string | null = null
+  let tbkOrden: string | null = null   // TBK_ORDEN_COMPRA (presente en timeout y error)
 
   if (req.method === 'POST') {
     const form = await req.formData()
-    tokenWs  = (form.get('token_ws') as string) ?? null
-    tbkToken = (form.get('TBK_TOKEN') as string) ?? null
+    tokenWs  = (form.get('token_ws')        as string) ?? null
+    tbkToken = (form.get('TBK_TOKEN')       as string) ?? null
+    tbkOrden = (form.get('TBK_ORDEN_COMPRA') as string) ?? null
   } else {
     const url = new URL(req.url)
     tokenWs  = url.searchParams.get('token_ws')
     tbkToken = url.searchParams.get('TBK_TOKEN')
+    tbkOrden = url.searchParams.get('TBK_ORDEN_COMPRA')
   }
 
   const admin = createAdminClient()
 
-  // ── Cancelado por el usuario ─────────────────────────────────
+  // ── Caso 3: Error en formulario — llegan AMBOS tokens ───────────────────────
+  // Transbank envía token_ws + TBK_TOKEN cuando el usuario hace "intentar nuevamente"
+  // tras un error en pantalla. NO se debe hacer commit; es una sesión inválida.
+  if (tokenWs && tbkToken) {
+    console.warn('[Transbank] Error en formulario: llegaron token_ws y TBK_TOKEN juntos. Abortando.')
+    await admin
+      .from('orders')
+      .update({ payment_status: 'fallido', status: 'cancelado' })
+      .eq('transbank_token', tokenWs)
+      .eq('payment_status', 'pendiente')
+    return NextResponse.redirect(`${appUrl}/checkout/confirmacion?status=error`, { status: 303 })
+  }
+
+  // ── Caso 2: Cancelado por el usuario — solo TBK_TOKEN ───────────────────────
   if (tbkToken && !tokenWs) {
     const { data: order } = await admin
       .from('orders')
@@ -103,10 +123,42 @@ async function handleReturn(req: Request): Promise<Response> {
     )
   }
 
-  if (!tokenWs) {
+  // ── Caso 4: Timeout — solo TBK_ORDEN_COMPRA, sin tokens ─────────────────────
+  // El usuario abrió el formulario pero no hizo nada por más de 5 minutos.
+  if (!tokenWs && !tbkToken) {
+    if (tbkOrden) {
+      // Buscar la orden pendiente cuyo buy_order coincide.
+      // buy_order = uuid.replace(/-/g,'').slice(0,26), así que buscamos en órdenes
+      // recientes (últimos 15 min) y comparamos en memoria.
+      const since = new Date(Date.now() - 15 * 60 * 1000).toISOString()
+      const { data: recientes } = await admin
+        .from('orders')
+        .select('id')
+        .eq('payment_status', 'pendiente')
+        .gte('created_at', since)
+
+      const match = recientes?.find(
+        o => o.id.replace(/-/g, '').slice(0, 26) === tbkOrden
+      )
+
+      if (match) {
+        await admin
+          .from('orders')
+          .update({ payment_status: 'fallido', status: 'cancelado' })
+          .eq('id', match.id)
+          .eq('payment_status', 'pendiente')
+
+        return NextResponse.redirect(
+          `${appUrl}/checkout/confirmacion?status=cancelled&orderId=${match.id}`,
+          { status: 303 }
+        )
+      }
+    }
+    // Sin TBK_ORDEN_COMPRA o sin match → redirigir a error genérico
     return NextResponse.redirect(`${appUrl}/checkout/confirmacion?status=error`, { status: 303 })
   }
 
+  // ── Caso 1: Pago completado/rechazado — solo token_ws ───────────────────────
   try {
     // 1. Verificar idempotencia: solo procesar si aún está pendiente
     const { data: existingOrder } = await admin
@@ -128,7 +180,7 @@ async function handleReturn(req: Request): Promise<Response> {
     }
 
     const tx     = createWebpayPlus()
-    const result = await tx.commit(tokenWs)
+    const result = await tx.commit(tokenWs!)
 
     const authorized =
       result?.response_code === 0 && String(result?.status).toUpperCase() === 'AUTHORIZED'
@@ -164,7 +216,7 @@ async function handleReturn(req: Request): Promise<Response> {
         status:         authorized ? 'nuevo'  : 'cancelado',
         ...transbankFields,
       })
-      .eq('transbank_token', tokenWs)
+      .eq('transbank_token', tokenWs!)
       .eq('payment_status', 'pendiente')
       .select('id, total, phone, commune, address, items')
       .maybeSingle()
