@@ -29,6 +29,7 @@ function formatFecha(isoString: string | null | undefined): string {
     return new Date(isoString).toLocaleString('es-CL', {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
+      timeZone: 'America/Santiago',
     })
   } catch {
     return isoString
