@@ -39,15 +39,34 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
   async function saveProduct() {
     if (!editing) return
     setSaving(true)
+
+    // Solo enviamos columnas reales de la tabla — excluimos `category` (join virtual)
+    // y `created_at` / `id` que no deben modificarse.
+    const payload = {
+      name:           editing.name,
+      description:    editing.description ?? null,
+      price:          editing.price,
+      price_wholesale: editing.price_wholesale ?? null,
+      category_id:    editing.category_id ?? null,
+      stock:          editing.stock ?? 0,
+      unit:           editing.unit ?? 'kg',
+      active:         editing.active ?? true,
+      featured:       editing.featured ?? false,
+      wholesale_only: editing.wholesale_only ?? false,
+      images:         editing.images ?? [],
+    }
+
     if (editing.id) {
-      const { data } = await supabase
-        .from('products').update(editing).eq('id', editing.id)
+      const { data, error } = await supabase
+        .from('products').update(payload).eq('id', editing.id)
         .select('*, category:categories(*)').single()
+      if (error) console.error('[saveProduct] update error:', error)
       if (data) setProducts(prev => prev.map(p => p.id === data.id ? data as Product : p))
     } else {
-      const { data } = await supabase
-        .from('products').insert(editing)
+      const { data, error } = await supabase
+        .from('products').insert(payload)
         .select('*, category:categories(*)').single()
+      if (error) console.error('[saveProduct] insert error:', error)
       if (data) setProducts(prev => [data as Product, ...prev])
     }
     setSaving(false)
