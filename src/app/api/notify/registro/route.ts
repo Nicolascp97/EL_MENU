@@ -53,16 +53,27 @@ async function notifyWhatsApp({
   }
 
   const emoji = tipo === 'mayorista' ? '🏢' : '🛒'
-  const msg = [
-    `${emoji} NUEVO REGISTRO El Menú`,
-    ``,
-    `👤 ${name}`,
-    `📧 ${email}`,
-    `📱 ${phone || 'No indicado'}`,
-    `🏷️ Tipo: ${tipo === 'mayorista' ? 'Mayorista (pendiente aprobación)' : 'Minorista'}`,
-    ``,
-    `→ Agregar al CRM`,
-  ].join('\n')
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.el-menu.cl'
+
+  const msg = tipo === 'mayorista'
+    ? [
+        `🏢 NUEVA SOLICITUD MAYORISTA`,
+        ``,
+        `👤 ${name}`,
+        `📧 ${email}`,
+        `📱 ${phone || 'No indicado'}`,
+        ``,
+        `→ Aprobar o rechazar en:`,
+        `${appUrl}/admin/mayoristas`,
+      ].join('\n')
+    : [
+        `🛒 NUEVO REGISTRO El Menú`,
+        ``,
+        `👤 ${name}`,
+        `📧 ${email}`,
+        `📱 ${phone || 'No indicado'}`,
+        `🏷️ Tipo: Minorista`,
+      ].join('\n')
 
   const url = `https://api.callmebot.com/whatsapp.php?phone=${waPhone}&text=${encodeURIComponent(msg)}&apikey=${apiKey}`
 

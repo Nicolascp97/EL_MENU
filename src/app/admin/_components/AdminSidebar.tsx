@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { ShoppingBag, Package, MapPin, ChefHat, LogOut, Store } from 'lucide-react'
+import { ShoppingBag, Package, MapPin, ChefHat, LogOut, Store, Building2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 const NAV = [
@@ -9,6 +9,7 @@ const NAV = [
   { href: '/admin/productos', label: 'Productos', icon: Package },
   { href: '/admin/zonas', label: 'Zonas', icon: MapPin },
   { href: '/admin/recetas', label: 'Recetas IA', icon: ChefHat },
+  { href: '/admin/mayoristas', label: 'Mayoristas', icon: Building2 },
   { href: '/catalogo', label: 'Catálogo', icon: Store, exact: false },
 ]
 
