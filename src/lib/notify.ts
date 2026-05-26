@@ -1,9 +1,12 @@
 /**
- * notify.ts — Módulo centralizado de notificaciones WhatsApp (CallMeBot)
+ * notify.ts — Módulo centralizado de notificaciones Telegram
  *
  * Todos los mensajes que el sistema envía a Celso pasan por aquí.
- * Cada función construye el texto, lo encodea y llama a CallMeBot.
- * Los errores nunca bloquean el flujo principal (try/catch interno).
+ * Usa la Telegram Bot API (más confiable que CallMeBot/WhatsApp).
+ *
+ * Variables de entorno requeridas:
+ *   TELEGRAM_BOT_TOKEN  → token del bot (BotFather)
+ *   TELEGRAM_CHAT_ID    → chat_id del dueño del bot (se obtiene tras enviar un mensaje)
  */
 
 const TIMEOUT_MS = 6_000
@@ -25,18 +28,23 @@ type StockItem = {
 
 // ─── Core ────────────────────────────────────────────────────────────────────
 
-async function sendWhatsApp(message: string): Promise<void> {
-  const apiKey  = process.env.CALLMEBOT_API_KEY
-  const waPhone = process.env.NEXT_PUBLIC_WA_NUMBER
-  if (!apiKey || !waPhone) {
-    console.log('[notify] CallMeBot no configurado. Mensaje omitido:\n', message)
+async function sendTelegram(message: string): Promise<void> {
+  const token  = process.env.TELEGRAM_BOT_TOKEN
+  const chatId = process.env.TELEGRAM_CHAT_ID
+  if (!token || !chatId) {
+    console.log('[notify] Telegram no configurado. Mensaje omitido:\n', message)
     return
   }
-  const url = `https://api.callmebot.com/whatsapp.php?phone=${waPhone}&text=${encodeURIComponent(message)}&apikey=${apiKey}`
+  const url = `https://api.telegram.org/bot${token}/sendMessage`
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
-    await fetch(url, { signal: controller.signal })
+    await fetch(url, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ chat_id: chatId, text: message }),
+      signal:  controller.signal,
+    })
   } catch {
     // No crítico — la operación original ya fue exitosa
   } finally {
@@ -70,7 +78,7 @@ export async function notifyPedidoTransferencia(order: OrderRow): Promise<void> 
     itemLines(order.items),
   ].join('\n')
 
-  await sendWhatsApp(msg)
+  await sendTelegram(msg)
 }
 
 // ─── 2. Nuevo pedido por WEBPAY (pago aprobado) ──────────────────────────────
@@ -87,7 +95,7 @@ export async function notifyPedidoWebpay(order: OrderRow): Promise<void> {
     itemLines(order.items),
   ].join('\n')
 
-  await sendWhatsApp(msg)
+  await sendTelegram(msg)
 }
 
 // ─── 3. Nueva solicitud de registro MAYORISTA ────────────────────────────────
@@ -110,10 +118,10 @@ export async function notifyRegistroMayorista(data: {
     `${appUrl}/admin`,
   ].join('\n')
 
-  await sendWhatsApp(msg)
+  await sendTelegram(msg)
 }
 
-// ─── 4. Mayorista APROBADO (aviso a Celso para confirmar al cliente) ─────────
+// ─── 4. Mayorista APROBADO ────────────────────────────────────────────────────
 
 export async function notifyMayoristaAprobado(data: {
   name:  string
@@ -129,11 +137,10 @@ export async function notifyMayoristaAprobado(data: {
     `Recuerda avisarle por WhatsApp o email.`,
   ].join('\n')
 
-  await sendWhatsApp(msg)
+  await sendTelegram(msg)
 }
 
 // ─── 5. Alerta de STOCK BAJO ─────────────────────────────────────────────────
-// Se llama después de un pedido cuando algún producto queda con poco stock.
 
 export async function notifyStockBajo(items: StockItem[]): Promise<void> {
   if (items.length === 0) return
@@ -154,5 +161,5 @@ export async function notifyStockBajo(items: StockItem[]): Promise<void> {
     `→ Actualizar en ${appUrl}/admin/productos`,
   ].join('\n')
 
-  await sendWhatsApp(msg)
+  await sendTelegram(msg)
 }
