@@ -121,6 +121,14 @@ function sanitizeCartSummary(raw: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  // Feature flag: CHAT_ENABLED=false desactiva el agente IA temporalmente
+  if (process.env.CHAT_ENABLED === 'false') {
+    return NextResponse.json(
+      { message: 'Menucito está descansando por ahora 🌙 Vuelve pronto.' },
+      { status: 503 }
+    )
+  }
+
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
   if (!checkRateLimit(ip)) {
     return NextResponse.json({ error: 'Demasiadas consultas. Intenta en un minuto.' }, { status: 429 })
