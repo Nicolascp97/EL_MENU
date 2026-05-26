@@ -17,6 +17,14 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const MAX_ITEMS = 50
 
 export async function POST(req: NextRequest) {
+  // Feature flag: WEBPAY_ENABLED=false desactiva el pago con tarjeta temporalmente
+  if (process.env.WEBPAY_ENABLED === 'false') {
+    return NextResponse.json(
+      { error: 'El pago con tarjeta no está disponible en este momento. Por favor usa transferencia bancaria.' },
+      { status: 503 }
+    )
+  }
+
   const csrfError = checkOrigin(req)
   if (csrfError) return csrfError
 

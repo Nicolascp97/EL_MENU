@@ -21,6 +21,7 @@ type Props = {
 
 const ORANGE    = '#E8621A'
 const ORANGE_DK = '#C44F0E'
+const WEBPAY_ENABLED = process.env.NEXT_PUBLIC_WEBPAY_ENABLED !== 'false'
 
 // Datos bancarios de El Menú SpA
 const BANK_DATA = {
@@ -63,9 +64,10 @@ export default function CheckoutClient({
   const [notes,          setNotes]          = useState('')
   const [loading,        setLoading]        = useState(false)
   const [error,          setError]          = useState<string | null>(null)
-  const [paymentMethod,  setPaymentMethod]  = useState<'webpay' | 'transfer'>(
-    initialPayment === 'webpay' || initialPayment === 'transfer' ? initialPayment : 'webpay'
-  )
+  const [paymentMethod,  setPaymentMethod]  = useState<'webpay' | 'transfer'>(() => {
+    if (!WEBPAY_ENABLED) return 'transfer'
+    return initialPayment === 'webpay' || initialPayment === 'transfer' ? initialPayment : 'webpay'
+  })
   const [deliveryMethod, setDeliveryMethod] = useState<'domicilio' | 'tienda'>(initialDelivery)
 
   const selectedZone = useMemo(
@@ -260,10 +262,11 @@ export default function CheckoutClient({
           <div className="grid grid-cols-2 gap-3">
             <PayMethodCard
               selected={paymentMethod === 'webpay'}
-              onClick={() => setPaymentMethod('webpay')}
+              onClick={() => WEBPAY_ENABLED && setPaymentMethod('webpay')}
               icon={<CreditCard size={20} />}
               label="Webpay / Tarjeta"
-              sublabel="Débito, crédito y prepago"
+              sublabel={WEBPAY_ENABLED ? 'Débito, crédito y prepago' : 'No disponible ahora'}
+              disabled={!WEBPAY_ENABLED}
             />
             <PayMethodCard
               selected={paymentMethod === 'transfer'}
@@ -273,6 +276,11 @@ export default function CheckoutClient({
               sublabel="Banco Santander"
             />
           </div>
+          {!WEBPAY_ENABLED && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+              El pago con tarjeta está temporalmente desactivado. Usa transferencia bancaria.
+            </p>
+          )}
 
           {/* ── Bloque datos de transferencia ── */}
           {paymentMethod === 'transfer' && (
@@ -382,18 +390,24 @@ export default function CheckoutClient({
 // ── Sub-componentes ──────────────────────────────────────────────────────────
 
 function PayMethodCard({
-  selected, onClick, icon, label, sublabel,
+  selected, onClick, icon, label, sublabel, disabled = false,
 }: {
-  selected: boolean; onClick: () => void; icon: React.ReactNode; label: string; sublabel: string
+  selected: boolean; onClick: () => void; icon: React.ReactNode; label: string; sublabel: string; disabled?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col items-start gap-1.5 p-3 rounded-xl border-2 text-left transition-all cursor-pointer"
-      style={{ borderColor: selected ? ORANGE : '#E5E7EB', background: selected ? '#FDE8D8' : '#fff' }}
+      disabled={disabled}
+      className="flex flex-col items-start gap-1.5 p-3 rounded-xl border-2 text-left transition-all"
+      style={{
+        borderColor: disabled ? '#E5E7EB' : selected ? ORANGE : '#E5E7EB',
+        background:  disabled ? '#F9FAFB' : selected ? '#FDE8D8' : '#fff',
+        cursor:      disabled ? 'not-allowed' : 'pointer',
+        opacity:     disabled ? 0.6 : 1,
+      }}
     >
-      <span style={{ color: selected ? ORANGE : '#6B7280' }}>{icon}</span>
+      <span style={{ color: disabled ? '#D1D5DB' : selected ? ORANGE : '#6B7280' }}>{icon}</span>
       <span className="text-sm font-semibold text-gray-900">{label}</span>
       <span className="text-xs text-gray-500">{sublabel}</span>
     </button>
