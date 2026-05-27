@@ -1,15 +1,17 @@
 /**
- * notify.ts — Módulo centralizado de notificaciones Telegram
+ * notify.ts — Módulo centralizado de notificaciones al dueño
  *
- * Todos los mensajes que el sistema envía a Celso pasan por aquí.
- * Usa la Telegram Bot API (más confiable que CallMeBot/WhatsApp).
+ * Todos los avisos que el sistema manda al negocio pasan por aquí.
+ * Hace POST a un workflow de n8n, que formatea el mensaje y lo envía por
+ * WhatsApp (YCloud) al número del dueño.
  *
  * Variables de entorno requeridas:
- *   TELEGRAM_BOT_TOKEN  → token del bot (BotFather)
- *   TELEGRAM_CHAT_ID    → chat_id del dueño del bot (se obtiene tras enviar un mensaje)
+ *   N8N_WEBHOOK_BASE_URL  → base del webhook n8n (ej: https://xxx.app.n8n.cloud/webhook)
+ *   N8N_WEBHOOK_SECRET    → secreto que valida el nodo "Validar Secret" del workflow
  */
 
 const TIMEOUT_MS = 6_000
+const WEBHOOK_PATH = 'elmenu-notificaciones'
 
 type OrderRow = {
   id:      string
@@ -28,22 +30,25 @@ type StockItem = {
 
 // ─── Core ────────────────────────────────────────────────────────────────────
 
-async function sendTelegram(message: string): Promise<void> {
-  const token  = process.env.TELEGRAM_BOT_TOKEN
-  const chatId = process.env.TELEGRAM_CHAT_ID
-  if (!token || !chatId) {
-    console.log('[notify] Telegram no configurado. Mensaje omitido:\n', message)
+async function sendToN8n(event: string, data: Record<string, unknown>): Promise<void> {
+  const base   = process.env.N8N_WEBHOOK_BASE_URL
+  const secret = process.env.N8N_WEBHOOK_SECRET
+  if (!base || !secret) {
+    console.log(`[notify] n8n no configurado. Evento omitido: ${event}`, data)
     return
   }
-  const url = `https://api.telegram.org/bot${token}/sendMessage`
+  const url = `${base.replace(/\/$/, '')}/${WEBHOOK_PATH}`
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
     await fetch(url, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ chat_id: chatId, text: message }),
-      signal:  controller.signal,
+      headers: {
+        'Content-Type':    'application/json',
+        'x-webhook-secret': secret,
+      },
+      body:   JSON.stringify({ event, ...data }),
+      signal: controller.signal,
     })
   } catch {
     // No crítico — la operación original ya fue exitosa
@@ -52,50 +57,40 @@ async function sendTelegram(message: string): Promise<void> {
   }
 }
 
-function itemLines(items: OrderRow['items']): string {
-  const MAX = 4
-  const lines = items
-    .slice(0, MAX)
+/** Formatea los ítems del pedido en texto multilínea, un producto por línea. */
+function formatItems(items: OrderRow['items']): string {
+  return items
     .map(i => `• ${i.product_name} ×${i.qty} ${i.unit}`)
     .join('\n')
-  const extra = items.length > MAX ? `\n+${items.length - MAX} producto${items.length - MAX > 1 ? 's' : ''} más` : ''
-  return lines + extra
 }
+
+const shortId = (id: string) => id.slice(0, 8).toUpperCase()
+const clp     = (n: number) => n.toLocaleString('es-CL')
 
 // ─── 1. Nuevo pedido por TRANSFERENCIA ───────────────────────────────────────
 
 export async function notifyPedidoTransferencia(order: OrderRow): Promise<void> {
-  const msg = [
-    `🥦 PEDIDO — TRANSFERENCIA`,
-    `#${order.id.slice(0, 8).toUpperCase()}`,
-    ``,
-    `💰 $${order.total.toLocaleString('es-CL')}`,
-    `📱 ${order.phone}`,
-    `📍 ${order.commune} — ${order.address}`,
-    ``,
-    `⚠️ Confirmar comprobante antes de preparar`,
-    ``,
-    itemLines(order.items),
-  ].join('\n')
-
-  await sendTelegram(msg)
+  await sendToN8n('pedido_transferencia', {
+    id:      shortId(order.id),
+    total:   clp(order.total),
+    phone:   order.phone,
+    commune: order.commune,
+    address: order.address,
+    items:   formatItems(order.items),
+  })
 }
 
 // ─── 2. Nuevo pedido por WEBPAY (pago aprobado) ──────────────────────────────
 
 export async function notifyPedidoWebpay(order: OrderRow): Promise<void> {
-  const msg = [
-    `✅ PEDIDO PAGADO — WEBPAY`,
-    `#${order.id.slice(0, 8).toUpperCase()}`,
-    ``,
-    `💰 $${order.total.toLocaleString('es-CL')}`,
-    `📱 ${order.phone}`,
-    `📍 ${order.commune} — ${order.address}`,
-    ``,
-    itemLines(order.items),
-  ].join('\n')
-
-  await sendTelegram(msg)
+  await sendToN8n('pedido_webpay', {
+    id:      shortId(order.id),
+    total:   clp(order.total),
+    phone:   order.phone,
+    commune: order.commune,
+    address: order.address,
+    items:   formatItems(order.items),
+  })
 }
 
 // ─── 3. Nueva solicitud de registro MAYORISTA ────────────────────────────────
@@ -105,20 +100,11 @@ export async function notifyRegistroMayorista(data: {
   email: string
   phone: string
 }): Promise<void> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.el-menu.cl'
-
-  const msg = [
-    `🏢 NUEVA SOLICITUD MAYORISTA`,
-    ``,
-    `👤 ${data.name}`,
-    `📧 ${data.email}`,
-    `📱 ${data.phone || 'No indicó'}`,
-    ``,
-    `→ Aprobar o rechazar:`,
-    `${appUrl}/admin`,
-  ].join('\n')
-
-  await sendTelegram(msg)
+  await sendToN8n('registro_mayorista', {
+    name:  data.name,
+    email: data.email,
+    phone: data.phone || 'No indicó',
+  })
 }
 
 // ─── 4. Mayorista APROBADO ────────────────────────────────────────────────────
@@ -127,39 +113,19 @@ export async function notifyMayoristaAprobado(data: {
   name:  string
   email: string
 }): Promise<void> {
-  const msg = [
-    `✅ MAYORISTA APROBADO`,
-    ``,
-    `👤 ${data.name}`,
-    `📧 ${data.email}`,
-    ``,
-    `Ya tiene acceso a precios mayoristas.`,
-    `Recuerda avisarle por WhatsApp o email.`,
-  ].join('\n')
-
-  await sendTelegram(msg)
+  await sendToN8n('mayorista_aprobado', {
+    name:  data.name,
+    email: data.email,
+  })
 }
 
 // ─── 5. Alerta de STOCK BAJO ─────────────────────────────────────────────────
 
 export async function notifyStockBajo(items: StockItem[]): Promise<void> {
   if (items.length === 0) return
-
-  const lines = items
-    .map(i => `• ${i.name}: ${i.stock} ${i.unit} restante${i.stock !== 1 ? 's' : ''}`)
-    .join('\n')
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.el-menu.cl'
-
-  const msg = [
-    `⚠️ STOCK BAJO — El Menú`,
-    ``,
-    `Los siguientes productos quedaron con poco stock:`,
-    ``,
-    lines,
-    ``,
-    `→ Actualizar en ${appUrl}/admin/productos`,
-  ].join('\n')
-
-  await sendTelegram(msg)
+  await sendToN8n('stock_bajo', {
+    items: items
+      .map(i => `• ${i.name}: ${i.stock} ${i.unit} restante${i.stock !== 1 ? 's' : ''}`)
+      .join('\n'),
+  })
 }
