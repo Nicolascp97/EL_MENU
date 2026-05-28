@@ -19,6 +19,7 @@ type OrderRow = {
   phone:   string
   commune: string
   address: string
+  name?:   string | null
   items:   { product_name: string; qty: number; unit: string }[]
 }
 
@@ -73,6 +74,7 @@ export async function notifyPedidoTransferencia(order: OrderRow): Promise<void> 
   await sendToN8n('pedido_transferencia', {
     id:      shortId(order.id),
     total:   clp(order.total),
+    name:    order.name ?? 'Sin nombre',
     phone:   order.phone,
     commune: order.commune,
     address: order.address,
@@ -86,6 +88,7 @@ export async function notifyPedidoWebpay(order: OrderRow): Promise<void> {
   await sendToN8n('pedido_webpay', {
     id:      shortId(order.id),
     total:   clp(order.total),
+    name:    order.name ?? 'Sin nombre',
     phone:   order.phone,
     commune: order.commune,
     address: order.address,

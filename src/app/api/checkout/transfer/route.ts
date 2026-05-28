@@ -165,6 +165,7 @@ export async function POST(req: NextRequest) {
       status: 'nuevo',
       items: orderItems,
       total,
+      name: body.name?.trim() || null,
       address: body.address.trim(),
       commune: body.commune,
       phone: body.phone.trim(),

@@ -22,6 +22,7 @@ type OrderRow = {
   phone: string
   commune: string
   address: string
+  name?: string | null
   items: { product_name: string; qty: number; unit: string }[]
 }
 
@@ -134,7 +135,7 @@ async function handleReturn(req: Request): Promise<Response> {
     // 1. Verificar idempotencia: solo procesar si aún está pendiente
     const { data: existingOrder } = await admin
       .from('orders')
-      .select('id, payment_status, total, phone, commune, address, items')
+      .select('id, payment_status, total, phone, commune, address, name, items')
       .eq('transbank_token', tokenWs)
       .maybeSingle()
 
@@ -189,7 +190,7 @@ async function handleReturn(req: Request): Promise<Response> {
       })
       .eq('transbank_token', tokenWs!)
       .eq('payment_status', 'pendiente')
-      .select('id, total, phone, commune, address, items')
+      .select('id, total, phone, commune, address, name, items')
       .maybeSingle()
 
     if (authorized && order) {

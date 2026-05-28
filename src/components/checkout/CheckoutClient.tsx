@@ -134,6 +134,7 @@ export default function CheckoutClient({
           address: finalAddress,
           commune: finalCommune,
           phone:   phone.trim(),
+          name:    name.trim(),
           notes:   notes.trim() || undefined,
         }),
       })
