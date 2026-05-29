@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { formatPrice } from '@/lib/utils'
 import Navbar from '@/components/catalog/Navbar'
 import type { Order } from '@/types/database'
+import ConfirmarPedidoWhatsAppButton from './ConfirmarPedidoWhatsAppButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,8 +42,11 @@ export default async function ConfirmacionPage({ searchParams }: { searchParams:
   const status   = params.status ?? 'error'
   const orderId  = params.orderId
 
-  // Extendemos el tipo con los campos Transbank opcionales
+  // Extendemos el tipo con los campos Transbank opcionales y los campos que
+  // existen en la tabla pero no están en el tipo `Order` (name, customer_type).
   type OrderWithTbk = Order & {
+    name?: string | null
+    customer_type?: 'minorista' | 'mayorista' | null
     transbank_authorization_code?: string | null
     transbank_card_last4?: string | null
     transbank_payment_type?: string | null
@@ -124,6 +128,20 @@ export default async function ConfirmacionPage({ searchParams }: { searchParams:
                 </div>
               )}
             </div>
+          )}
+
+          {/* ── Botón naranjo: confirmar pedido por WhatsApp del cliente ── */}
+          {order && (isSuccess || isTransfer) && (
+            <ConfirmarPedidoWhatsAppButton
+              order={{
+                id:            order.id,
+                total:         order.total,
+                address:       `${order.address}, ${order.commune}`,
+                name:          order.name,
+                customer_type: order.customer_type,
+                items:         order.items,
+              }}
+            />
           )}
 
           {/* ── Comprobante Transbank (requerido por Transbank para validación) ── */}

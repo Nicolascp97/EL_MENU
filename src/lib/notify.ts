@@ -10,6 +10,8 @@
  *   N8N_WEBHOOK_SECRET    → secreto que valida el nodo "Validar Secret" del workflow
  */
 
+import { clp, shortId, catalogUrl, formatItems } from './orderMessage'
+
 const TIMEOUT_MS = 6_000
 const WEBHOOK_PATH = 'elmenu-notificaciones'
 
@@ -58,39 +60,6 @@ async function sendToN8n(event: string, data: Record<string, unknown>): Promise<
     clearTimeout(timer)
   }
 }
-
-/** Etiquetas legibles para el campo unit (lo que sale al cliente entre paréntesis). */
-const UNIT_LABELS: Record<string, string> = {
-  kg:     'Kg',
-  unid:   'Unidad',
-  paq:    'Paquete',
-  ramo:   'Ramo',
-  bolsa:  'Bolsa',
-  maceta: 'Maceta',
-  caja:   'Caja',
-  gr:     'Gramos',
-}
-
-/** Formato pedido por el cliente:  • 3 ALBAHACA (1 Paquete): CLP 3,000 */
-function formatItems(items: OrderRow['items']): string {
-  return items
-    .map(i => {
-      const label     = UNIT_LABELS[i.unit] ?? i.unit
-      const lineTotal = i.qty * i.unit_price
-      return `• ${i.qty} ${i.product_name.toUpperCase()} (1 ${label}): CLP ${clp(lineTotal)}`
-    })
-    .join('\n')
-}
-
-/** URL del catálogo que delata si el pedido vino por mayorista o minorista. */
-function catalogUrl(customerType?: string | null): string {
-  const base = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.el-menu.cl').replace(/\/$/, '')
-  return customerType === 'mayorista' ? `${base}/mayorista` : `${base}/catalogo`
-}
-
-const shortId = (id: string) => id.slice(0, 8).toUpperCase()
-/** Formato pedido por el cliente: 92,900  (coma como separador de miles). */
-const clp     = (n: number) => n.toLocaleString('en-US')
 
 // ─── 1. Nuevo pedido por TRANSFERENCIA ───────────────────────────────────────
 
