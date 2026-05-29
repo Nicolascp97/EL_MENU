@@ -14,13 +14,14 @@ const TIMEOUT_MS = 6_000
 const WEBHOOK_PATH = 'elmenu-notificaciones'
 
 type OrderRow = {
-  id:      string
-  total:   number
-  phone:   string
-  commune: string
-  address: string
-  name?:   string | null
-  items:   { product_name: string; qty: number; unit: string }[]
+  id:            string
+  total:         number
+  phone:         string
+  commune:       string
+  address:       string
+  name?:         string | null
+  customer_type?: 'minorista' | 'mayorista' | null
+  items:         { product_name: string; qty: number; unit: string; unit_price: number }[]
 }
 
 type StockItem = {
@@ -58,27 +59,52 @@ async function sendToN8n(event: string, data: Record<string, unknown>): Promise<
   }
 }
 
-/** Formatea los ítems del pedido en texto multilínea, un producto por línea. */
+/** Etiquetas legibles para el campo unit (lo que sale al cliente entre paréntesis). */
+const UNIT_LABELS: Record<string, string> = {
+  kg:     'Kg',
+  unid:   'Unidad',
+  paq:    'Paquete',
+  ramo:   'Ramo',
+  bolsa:  'Bolsa',
+  maceta: 'Maceta',
+  caja:   'Caja',
+  gr:     'Gramos',
+}
+
+/** Formato pedido por el cliente:  • 3 ALBAHACA (1 Paquete): CLP 3,000 */
 function formatItems(items: OrderRow['items']): string {
   return items
-    .map(i => `• ${i.product_name} ×${i.qty} ${i.unit}`)
+    .map(i => {
+      const label     = UNIT_LABELS[i.unit] ?? i.unit
+      const lineTotal = i.qty * i.unit_price
+      return `• ${i.qty} ${i.product_name.toUpperCase()} (1 ${label}): CLP ${clp(lineTotal)}`
+    })
     .join('\n')
 }
 
+/** URL del catálogo que delata si el pedido vino por mayorista o minorista. */
+function catalogUrl(customerType?: string | null): string {
+  const base = (process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.el-menu.cl').replace(/\/$/, '')
+  return customerType === 'mayorista' ? `${base}/mayorista` : `${base}/catalogo`
+}
+
 const shortId = (id: string) => id.slice(0, 8).toUpperCase()
-const clp     = (n: number) => n.toLocaleString('es-CL')
+/** Formato pedido por el cliente: 92,900  (coma como separador de miles). */
+const clp     = (n: number) => n.toLocaleString('en-US')
 
 // ─── 1. Nuevo pedido por TRANSFERENCIA ───────────────────────────────────────
 
 export async function notifyPedidoTransferencia(order: OrderRow): Promise<void> {
   await sendToN8n('pedido_transferencia', {
-    id:      shortId(order.id),
-    total:   clp(order.total),
-    name:    order.name ?? 'Sin nombre',
-    phone:   order.phone,
-    commune: order.commune,
-    address: order.address,
-    items:   formatItems(order.items),
+    id:            shortId(order.id),
+    total:         clp(order.total),
+    name:          order.name ?? 'Sin nombre',
+    customer_type: order.customer_type ?? 'minorista',
+    catalog_url:   catalogUrl(order.customer_type),
+    phone:         order.phone,
+    commune:       order.commune,
+    address:       order.address,
+    items:         formatItems(order.items),
   })
 }
 
@@ -86,13 +112,15 @@ export async function notifyPedidoTransferencia(order: OrderRow): Promise<void> 
 
 export async function notifyPedidoWebpay(order: OrderRow): Promise<void> {
   await sendToN8n('pedido_webpay', {
-    id:      shortId(order.id),
-    total:   clp(order.total),
-    name:    order.name ?? 'Sin nombre',
-    phone:   order.phone,
-    commune: order.commune,
-    address: order.address,
-    items:   formatItems(order.items),
+    id:            shortId(order.id),
+    total:         clp(order.total),
+    name:          order.name ?? 'Sin nombre',
+    customer_type: order.customer_type ?? 'minorista',
+    catalog_url:   catalogUrl(order.customer_type),
+    phone:         order.phone,
+    commune:       order.commune,
+    address:       order.address,
+    items:         formatItems(order.items),
   })
 }
 

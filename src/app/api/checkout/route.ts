@@ -160,6 +160,7 @@ export async function POST(req: NextRequest) {
       items: orderItems,
       total,
       name: body.name?.trim() || null,
+      customer_type: useWholesale ? 'mayorista' : 'minorista',
       address: body.address.trim(),
       commune: body.commune,
       phone: body.phone.trim(),
