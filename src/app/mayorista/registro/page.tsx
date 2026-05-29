@@ -9,7 +9,7 @@ export default function RegistroMayoristaPage() {
   const router = useRouter()
   const [form, setForm] = useState({
     name: '',
-    phone: '',
+    phoneRaw: '',  // solo la parte después de +56
     email: '',
     password: '',
   })
@@ -35,9 +35,8 @@ export default function RegistroMayoristaPage() {
       options: {
         data: {
           name: form.name,
-          phone: form.phone,
-          role: 'minorista',
-          mayorista_requested: true,
+          phone: '+56' + form.phoneRaw.replace(/\s/g, ''),
+          role: 'mayorista',
         },
       },
     })
@@ -55,7 +54,7 @@ export default function RegistroMayoristaPage() {
       body: JSON.stringify({
         name: form.name,
         email: form.email,
-        phone: form.phone,
+        phone: '+56' + form.phoneRaw.replace(/\s/g, ''),
         tipo: 'mayorista',
       }),
     }).catch(() => {
@@ -109,8 +108,7 @@ export default function RegistroMayoristaPage() {
             </p>
             <p className="text-gray-500 text-sm mb-6">
               Haz clic en el enlace del correo para activar tu cuenta. Una vez
-              confirmado, el equipo de El Menú revisará tu solicitud y activará
-              tu acceso mayorista en 24-48 horas.
+              confirmado tendrás acceso inmediato a los precios mayoristas.
             </p>
 
             {/* Resend */}
@@ -195,16 +193,21 @@ export default function RegistroMayoristaPage() {
             >
               Teléfono de contacto
             </label>
-            <input
-              id="phone"
-              type="tel"
-              required
-              autoComplete="tel"
-              value={form.phone}
-              onChange={e => update('phone', e.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              placeholder="+56 9 1234 5678"
-            />
+            <div className="flex rounded-xl border border-gray-300 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-transparent overflow-hidden">
+              <span className="flex items-center px-3 bg-gray-50 border-r border-gray-300 text-sm text-gray-600 font-medium select-none">
+                +56
+              </span>
+              <input
+                id="phone"
+                type="tel"
+                required
+                autoComplete="tel"
+                value={form.phoneRaw}
+                onChange={e => update('phoneRaw', e.target.value)}
+                className="flex-1 px-3 py-2.5 text-sm focus:outline-none"
+                placeholder="9 1234 5678"
+              />
+            </div>
           </div>
 
           <div>

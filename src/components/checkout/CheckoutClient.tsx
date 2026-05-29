@@ -58,7 +58,10 @@ export default function CheckoutClient({
   }, [zones])
 
   const [name,           setName]           = useState(initialName    ?? '')
-  const [phone,          setPhone]          = useState(initialPhone   ?? '')
+  // phone guarda solo la parte después del +56, el prefijo se añade al enviar
+  const [phone,          setPhone]          = useState(() =>
+    (initialPhone ?? '').replace(/^\+?56\s*/, '')
+  )
   const [address,        setAddress]        = useState(initialAddress ?? '')
   const [commune,        setCommune]        = useState(allCommunes[0] ?? '')
   const [notes,          setNotes]          = useState('')
@@ -105,6 +108,8 @@ export default function CheckoutClient({
       const finalAddress = deliveryMethod === 'tienda' ? 'Retiro en tienda' : address.trim()
       const finalCommune = deliveryMethod === 'tienda' ? 'Retiro en tienda' : commune
 
+      const fullPhone = '+56' + phone.replace(/\s/g, '')
+
       if (paymentMethod === 'transfer') {
         const res = await fetch('/api/checkout/transfer', {
           method: 'POST',
@@ -113,7 +118,7 @@ export default function CheckoutClient({
             items:   items.map(i => ({ product_id: i.product.id, qty: i.qty })),
             address: finalAddress,
             commune: finalCommune,
-            phone:   phone.trim(),
+            phone:   fullPhone,
             name:    name.trim(),
             notes:   notes.trim() || undefined,
           }),
@@ -133,7 +138,7 @@ export default function CheckoutClient({
           items:   items.map(i => ({ product_id: i.product.id, qty: i.qty })),
           address: finalAddress,
           commune: finalCommune,
-          phone:   phone.trim(),
+          phone:   fullPhone,
           name:    name.trim(),
           notes:   notes.trim() || undefined,
         }),
@@ -194,7 +199,25 @@ export default function CheckoutClient({
         <section className="space-y-3">
           <h2 className="text-base font-semibold text-gray-900">Datos de contacto</h2>
           <Field label="Nombre" required value={name} onChange={setName} placeholder="Tu nombre o razón social" />
-          <Field label="Teléfono" required type="tel" value={phone} onChange={setPhone} placeholder="+56 9 1234 5678" />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Teléfono <span className="text-red-500">*</span>
+            </label>
+            <div className="flex rounded-xl border border-gray-300 focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-transparent overflow-hidden">
+              <span className="flex items-center px-3 bg-gray-50 border-r border-gray-300 text-sm text-gray-600 font-medium select-none">
+                +56
+              </span>
+              <input
+                type="tel"
+                required
+                autoComplete="tel"
+                value={phone}
+                onChange={e => setPhone(e.target.value)}
+                placeholder="9 1234 5678"
+                className="flex-1 px-3 py-2.5 text-sm focus:outline-none"
+              />
+            </div>
+          </div>
           {userEmail && (
             <p className="text-xs text-gray-500">
               Confirmaciones a <strong>{userEmail}</strong>
