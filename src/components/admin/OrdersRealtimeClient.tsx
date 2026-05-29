@@ -431,6 +431,14 @@ function OrderCard({ order, updating, onUpdateStatus }: {
   const currentIdx = STATUS_FLOW.indexOf(order.status as OrderStatus)
   const nextStatus = currentIdx < STATUS_FLOW.length - 1 ? STATUS_FLOW[currentIdx + 1] : null
   const isWA = order.channel === 'whatsapp'
+  const isCancellable = order.status !== 'entregado' && order.status !== 'cancelado'
+  const [confirming, setConfirming] = useState(false)
+
+  function handleCancelClick() {
+    if (!confirming) { setConfirming(true); return }
+    onUpdateStatus(order.id, 'cancelado')
+    setConfirming(false)
+  }
 
   return (
     <div style={{
@@ -473,7 +481,7 @@ function OrderCard({ order, updating, onUpdateStatus }: {
         )}
       </div>
 
-      {/* CTA */}
+      {/* CTA principal */}
       {nextStatus && (
         <button
           onClick={() => onUpdateStatus(order.id, nextStatus)}
@@ -487,6 +495,49 @@ function OrderCard({ order, updating, onUpdateStatus }: {
         >
           {updating ? '...' : `Mover a ${STATUS_LABELS[nextStatus]}`}
         </button>
+      )}
+
+      {/* Cancelar pedido */}
+      {isCancellable && (
+        confirming ? (
+          <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+            <button
+              onClick={handleCancelClick}
+              disabled={updating}
+              style={{
+                flex: 1, padding: '8px', borderRadius: 8,
+                border: 'none', background: '#EF4444', color: '#fff',
+                fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                opacity: updating ? .6 : 1,
+              }}
+            >
+              {updating ? '...' : '✓ Sí, cancelar'}
+            </button>
+            <button
+              onClick={() => setConfirming(false)}
+              style={{
+                padding: '8px 12px', borderRadius: 8,
+                border: '1px solid #E5E7EB', background: '#F9FAFB',
+                color: '#6B7280', fontWeight: 600, fontSize: 12, cursor: 'pointer',
+              }}
+            >
+              No
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleCancelClick}
+            disabled={updating}
+            style={{
+              width: '100%', marginTop: 6, padding: '7px', borderRadius: 8,
+              border: '1px solid #FECACA', background: 'transparent',
+              color: '#EF4444', fontWeight: 600, fontSize: 11,
+              cursor: 'pointer', opacity: updating ? .5 : 1,
+            }}
+          >
+            Cancelar pedido
+          </button>
+        )
       )}
     </div>
   )
