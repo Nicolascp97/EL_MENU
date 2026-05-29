@@ -36,7 +36,7 @@ export default function ConfirmarPedidoWhatsAppButton({ order }: Props) {
         className="mt-3 text-center"
         style={{ color: '#6B7280', fontWeight: 500, fontSize: 13 }}
       >
-        ⚠️ Importante: tócalo para que tu pedido entre a despacho hoy
+        ⚠️ Importante: tócalo para que nos enteremos de tu Pedido.
       </p>
     </div>
   )
