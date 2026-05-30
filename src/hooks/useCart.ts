@@ -29,7 +29,9 @@ export const useCart = create<CartStore>()(
       cartMode: 'minorista',
 
       addItem: (product, wholesaleMode = false) => {
-        if (wholesaleMode) set({ cartMode: 'mayorista' })
+        // Siempre actualizar el modo según el catálogo desde el que se agrega.
+        // Si el usuario cambia de catálogo, el modo se actualiza al último item agregado.
+        set({ cartMode: wholesaleMode ? 'mayorista' : 'minorista' })
         const items = get().items
         const existing = items.find(i => i.product.id === product.id)
         if (existing) {

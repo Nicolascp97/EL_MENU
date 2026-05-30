@@ -108,9 +108,9 @@ export default function LoginMayoristaPage() {
         </form>
 
         <p className="text-center text-sm text-gray-500 mt-6">
-          ¿No tienes cuenta?{' '}
-          <Link href="/mayorista/registro" className="font-semibold text-emerald-700 hover:underline">
-            Regístrate
+          ¿Necesitas comprar al por mayor?{' '}
+          <Link href="/mayorista" className="font-semibold text-emerald-700 hover:underline">
+            Ver catálogo mayorista
           </Link>
         </p>
       </div>

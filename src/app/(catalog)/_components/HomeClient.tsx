@@ -461,7 +461,7 @@ const HOW_STEPS = [
 const MENU_ITEMS: { icon: React.ReactNode; label: string; href: string; isExternal?: boolean; tag?: string }[] = [
   { icon: '🥬', label: 'Catálogo minorista', href: '/catalogo' },
   { icon: '🏪', label: 'Catálogo mayorista', href: '/mayorista', tag: 'Empresas' },
-  { icon: '🏢', label: 'Registra tu negocio', href: '/mayorista/registro' },
+  { icon: '🏢', label: 'Catálogo mayorista', href: '/mayorista', tag: 'Al por mayor' },
   { icon: '🤖', label: 'Asistente IA · Menucito', href: 'https://wa.me/56954952395?text=Hola%20Menucito!%20Necesito%20armar%20un%20pedido', isExternal: true, tag: 'Nuevo' },
   { icon: '📦', label: 'Seguir mi pedido', href: '/mi-cuenta#pedidos' },
   { icon: '🚚', label: 'Zonas de despacho', href: '#zonas' },
@@ -472,7 +472,7 @@ const MENU_ITEMS: { icon: React.ReactNode; label: string; href: string; isExtern
 const FAQS = [
   { q: '¿A qué comunas despachan?', a: 'Despachamos a comunas seleccionadas de la Región Metropolitana de Santiago. El despacho tiene un costo único de $2.990 y el pedido mínimo es $20.000. Revisa la sección de Zonas de despacho para ver si tu comuna está incluida.' },
   { q: '¿Cuánto tarda mi pedido en llegar?', a: 'Pide hoy y recibes mañana. También puedes programar la fecha que más te acomode al hacer el checkout.' },
-  { q: '¿Cómo accedo a precios mayoristas?', a: 'Si tienes restaurante, almacén, verdulería u otro negocio, regístrate en <a href="/mayorista/registro">/mayorista/registro</a> con tu RUT comercial. Validamos y activamos tu cuenta en menos de 24 horas hábiles.' },
+  { q: '¿Cómo accedo a precios mayoristas?', a: 'El catálogo mayorista está abierto a cualquier negocio. Solo ve a <a href="/mayorista">el-menu.cl/mayorista</a> y agrega los productos que necesitas. El pedido mínimo es de $60.000.' },
   { q: '¿Qué pasa si un producto no llega fresco?', a: 'Tenemos garantía de frescura: si algo no cumple, lo cambiamos o devolvemos el dinero. Escríbenos por <a href="https://wa.me/56954952395">WhatsApp</a> con foto y lo resolvemos de inmediato.' },
   { q: '¿Qué medios de pago aceptan?', a: 'Aceptamos Webpay Plus de Transbank (débito, crédito y prepago). Es el único medio de pago disponible por ahora.' },
 ]
@@ -961,13 +961,12 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
                 <p>Seleccionamos el mejor producto de temporada cada madrugada y lo dejamos en tu cocina antes de que abras. Con factura electrónica al instante.</p>
                 <div className="b2b-stats">
                   <div className="stat"><div className="n num">127+</div><div className="l">Restaurantes activos</div></div>
-                  <div className="stat"><div className="n num">24h</div><div className="l">Activación de cuenta</div></div>
+                  <div className="stat"><div className="n num">$60.000</div><div className="l">Pedido mínimo</div></div>
                   <div className="stat"><div className="n num">&lt; 7 AM</div><div className="l">Entrega garantizada</div></div>
                 </div>
               </div>
               <div className="b2b-cta">
-                <Link href="/mayorista" className="btn-primary">Ir al catálogo mayorista <IcoArrow size={18} /></Link>
-                <Link href="/mayorista/registro" className="btn-ghost"><IcoStore size={16} /> Registrar mi negocio</Link>
+                <Link href="/mayorista" className="btn-primary">Ver catálogo mayorista <IcoArrow size={18} /></Link>
               </div>
             </div>
           </div>
