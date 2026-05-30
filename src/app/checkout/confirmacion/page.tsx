@@ -134,12 +134,13 @@ export default async function ConfirmacionPage({ searchParams }: { searchParams:
           {order && (isSuccess || isTransfer) && (
             <ConfirmarPedidoWhatsAppButton
               order={{
-                id:            order.id,
-                total:         order.total,
-                address:       `${order.address}, ${order.commune}`,
-                name:          order.name,
-                customer_type: order.customer_type,
-                items:         order.items,
+                id:             order.id,
+                total:          order.total,
+                address:        `${order.address}, ${order.commune}`,
+                name:           order.name,
+                customer_type:  order.customer_type,
+                payment_method: order.payment_method,
+                items:          order.items,
               }}
             />
           )}

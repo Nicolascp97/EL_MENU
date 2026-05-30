@@ -7,12 +7,13 @@
  */
 
 export type OrderForMessage = {
-  id:             string
-  total:          number
-  address:        string
-  name?:          string | null
-  customer_type?: 'minorista' | 'mayorista' | null
-  items:          { product_name: string; qty: number; unit: string; unit_price: number }[]
+  id:              string
+  total:           number
+  address:         string
+  name?:           string | null
+  customer_type?:  'minorista' | 'mayorista' | null
+  payment_method?: 'webpay' | 'transfer' | null
+  items:           { product_name: string; qty: number; unit: string; unit_price: number }[]
 }
 
 /** Etiquetas legibles para el campo unit (lo que sale al cliente entre paréntesis). */
@@ -56,6 +57,10 @@ export function formatItems(items: OrderForMessage['items']): string {
  * en ambos canales.
  */
 export function buildCustomerWhatsAppMessage(order: OrderForMessage): string {
+  const pagoLine = order.payment_method === 'webpay'
+    ? '• _Pago:_ *PAGADO*'
+    : '• _Pago:_ PENDIENTE DE PAGO (comprobante)'
+
   return [
     'Hola, me gustaría comprar los siguientes productos:',
     '',
@@ -69,6 +74,7 @@ export function buildCustomerWhatsAppMessage(order: OrderForMessage): string {
     `• _Nombre:_ ${order.name?.trim() || 'Sin nombre'}`,
     `• _Dirección:_ ${order.address}`,
     `• _Pedido:_ #${shortId(order.id)}`,
+    pagoLine,
     catalogUrl(order.customer_type),
     'Gracias.',
   ].join('\n')
