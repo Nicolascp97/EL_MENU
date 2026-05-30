@@ -62,8 +62,6 @@ export default function CatalogClient({
   }, [search, selectedCategory, pathname, router])
 
   const wholesaleMode = mode === 'mayorista'
-  const canPurchase =
-    mode === 'minorista' || userRole === 'mayorista' || userRole === 'admin'
 
   // Para el strip: cuántos productos hay por categoría + ofertas.
   const counts = useMemo(() => {
@@ -117,7 +115,6 @@ export default function CatalogClient({
         categoryCount={visibleCategories.length}
         search={search}
         onSearchChange={setSearch}
-        canPurchase={canPurchase}
         userRole={userRole}
       />
 
@@ -179,7 +176,6 @@ export default function CatalogClient({
                 key={p.id}
                 product={p}
                 wholesaleMode={wholesaleMode}
-                canPurchase={canPurchase}
               />
             ))}
           </div>

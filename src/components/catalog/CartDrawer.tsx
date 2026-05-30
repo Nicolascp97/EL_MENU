@@ -34,7 +34,7 @@ function OptionBtn({
 }
 
 export default function CartDrawer() {
-  const { items, isOpen, toggleCart, updateQty, removeItem, clearCart, total } = useCart()
+  const { items, isOpen, toggleCart, updateQty, removeItem, clearCart, total, cartMode, itemPrice } = useCart()
   const [deliveryMethod, setDeliveryMethod] = useState<'domicilio' | 'tienda'>('domicilio')
   const [paymentMethod, setPaymentMethod] = useState<'webpay' | 'transfer'>('webpay')
 
@@ -42,7 +42,7 @@ export default function CartDrawer() {
 
   const deliveryFee = deliveryMethod === 'domicilio' ? DELIVERY_PRICE : 0
   const grandTotal = total() + deliveryFee
-  const checkoutHref = `/checkout?delivery=${deliveryMethod}&payment=${paymentMethod}`
+  const checkoutHref = `/checkout?delivery=${deliveryMethod}&payment=${paymentMethod}&mode=${cartMode}`
 
   return (
     <>
@@ -93,7 +93,7 @@ export default function CartDrawer() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm text-gray-900 truncate">{product.name}</p>
-                  <p className="text-xs text-gray-500">{formatPrice(product.price)} / {product.unit}</p>
+                  <p className="text-xs text-gray-500">{formatPrice(itemPrice(product))} / {product.unit}</p>
                   <div className="flex items-center gap-2 mt-1.5">
                     <button
                       onClick={() => updateQty(product.id, qty - 1)}
@@ -112,7 +112,7 @@ export default function CartDrawer() {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-semibold text-sm" style={{ color: 'var(--green-dark)' }}>
-                    {formatPrice(product.price * qty)}
+                    {formatPrice(itemPrice(product) * qty)}
                   </p>
                   <button onClick={() => removeItem(product.id)} className="mt-1 text-gray-400 hover:text-red-500">
                     <Trash2 size={14} />

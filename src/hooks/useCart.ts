@@ -11,12 +11,14 @@ type CartItem = {
 type CartStore = {
   items: CartItem[]
   isOpen: boolean
-  addItem: (product: Product) => void
+  cartMode: 'minorista' | 'mayorista'
+  addItem: (product: Product, wholesaleMode?: boolean) => void
   removeItem: (productId: string) => void
   updateQty: (productId: string, qty: number) => void
   clearCart: () => void
   toggleCart: () => void
   total: () => number
+  itemPrice: (product: Product) => number
 }
 
 export const useCart = create<CartStore>()(
@@ -24,7 +26,10 @@ export const useCart = create<CartStore>()(
     (set, get) => ({
       items: [],
       isOpen: false,
-      addItem: (product) => {
+      cartMode: 'minorista',
+
+      addItem: (product, wholesaleMode = false) => {
+        if (wholesaleMode) set({ cartMode: 'mayorista' })
         const items = get().items
         const existing = items.find(i => i.product.id === product.id)
         if (existing) {
@@ -33,9 +38,11 @@ export const useCart = create<CartStore>()(
           set({ items: [...items, { product, qty: 1 }] })
         }
       },
+
       removeItem: (productId) => {
         set({ items: get().items.filter(i => i.product.id !== productId) })
       },
+
       updateQty: (productId, qty) => {
         if (qty <= 0) {
           get().removeItem(productId)
@@ -43,9 +50,19 @@ export const useCart = create<CartStore>()(
         }
         set({ items: get().items.map(i => i.product.id === productId ? { ...i, qty } : i) })
       },
-      clearCart: () => set({ items: [] }),
+
+      clearCart: () => set({ items: [], cartMode: 'minorista' }),
+
       toggleCart: () => set({ isOpen: !get().isOpen }),
-      total: () => get().items.reduce((sum, i) => sum + i.product.price * i.qty, 0),
+
+      // Precio efectivo de un producto según el modo del carrito
+      itemPrice: (product) => {
+        const isWholesale = get().cartMode === 'mayorista' && product.price_wholesale != null
+        return isWholesale ? product.price_wholesale! : product.price
+      },
+
+      total: () =>
+        get().items.reduce((sum, i) => sum + get().itemPrice(i.product) * i.qty, 0),
     }),
     { name: 'elmenu-cart' }
   )

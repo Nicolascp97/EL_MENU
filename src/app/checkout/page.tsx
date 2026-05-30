@@ -5,10 +5,11 @@ import type { Zone, UserRole } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
 
-type SearchParams = Promise<{ delivery?: string; payment?: string }>
+type SearchParams = Promise<{ delivery?: string; payment?: string; mode?: string }>
 
 export default async function CheckoutPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
+  const isMayorista = params.mode === 'mayorista'
   const initialDelivery = params.delivery === 'tienda' ? 'tienda' : 'domicilio'
   const validPayments = ['webpay', 'transfer'] as const
   type ValidPayment = typeof validPayments[number]
@@ -53,6 +54,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Sea
         <CheckoutClient
           zones={(zones as Zone[]) ?? []}
           userRole={userRole}
+          isMayorista={isMayorista}
           initialName={initialName}
           initialPhone={initialPhone}
           initialAddress={initialAddress}

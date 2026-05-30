@@ -11,6 +11,7 @@ import type { Zone, UserRole } from '@/types/database'
 type Props = {
   zones: Zone[]
   userRole: UserRole
+  isMayorista?: boolean
   userEmail: string | null
   initialName: string | null
   initialPhone: string | null
@@ -36,6 +37,7 @@ const BANK_DATA = {
 export default function CheckoutClient({
   zones,
   userRole,
+  isMayorista = false,
   userEmail,
   initialName,
   initialPhone,
@@ -115,12 +117,13 @@ export default function CheckoutClient({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            items:   items.map(i => ({ product_id: i.product.id, qty: i.qty })),
-            address: finalAddress,
-            commune: finalCommune,
-            phone:   fullPhone,
-            name:    name.trim(),
-            notes:   notes.trim() || undefined,
+            items:       items.map(i => ({ product_id: i.product.id, qty: i.qty })),
+            address:     finalAddress,
+            commune:     finalCommune,
+            phone:       fullPhone,
+            name:        name.trim(),
+            notes:       notes.trim() || undefined,
+            is_mayorista: isMayorista,
           }),
         })
         const data = await res.json()
@@ -135,12 +138,13 @@ export default function CheckoutClient({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items:   items.map(i => ({ product_id: i.product.id, qty: i.qty })),
-          address: finalAddress,
-          commune: finalCommune,
-          phone:   fullPhone,
-          name:    name.trim(),
-          notes:   notes.trim() || undefined,
+          items:       items.map(i => ({ product_id: i.product.id, qty: i.qty })),
+          address:     finalAddress,
+          commune:     finalCommune,
+          phone:       fullPhone,
+          name:        name.trim(),
+          notes:       notes.trim() || undefined,
+          is_mayorista: isMayorista,
         }),
       })
       const data = await res.json()

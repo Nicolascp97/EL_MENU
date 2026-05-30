@@ -1,7 +1,6 @@
 'use client'
 import Image from 'next/image'
-import Link from 'next/link'
-import { Plus, Check, Lock } from 'lucide-react'
+import { Plus, Check } from 'lucide-react'
 import { useState } from 'react'
 import type { Product } from '@/types/database'
 import { formatPrice } from '@/lib/utils'
@@ -10,14 +9,11 @@ import { useCart } from '@/hooks/useCart'
 type Props = {
   product: Product
   wholesaleMode?: boolean
-  /** Si false, oculta el botón "agregar" y muestra CTA para registrarse. */
-  canPurchase?: boolean
 }
 
 export default function ProductCard({
   product,
   wholesaleMode = false,
-  canPurchase = true,
 }: Props) {
   const addItem = useCart(s => s.addItem)
   const [added, setAdded] = useState(false)
@@ -35,7 +31,7 @@ export default function ProductCard({
     (wholesaleMode ? imgs[1] ?? imgs[0] : imgs[0]) || '/placeholders/default.svg'
 
   function handleAdd() {
-    addItem(product)
+    addItem(product, wholesaleMode)
     setAdded(true)
     setTimeout(() => setAdded(false), 1200)
   }
@@ -108,7 +104,7 @@ export default function ProductCard({
             >
               Agotado
             </span>
-          ) : canPurchase ? (
+          ) : (
             <button
               type="button"
               onClick={handleAdd}
@@ -118,16 +114,6 @@ export default function ProductCard({
             >
               {added ? <Check size={16} /> : <Plus size={18} />}
             </button>
-          ) : (
-            <Link
-              href={`/mayorista/registro?next=/mayorista`}
-              className="inline-flex items-center gap-1.5 h-10 px-3 rounded-full text-xs font-semibold border shrink-0"
-              style={{ color: accent, borderColor: accent, backgroundColor: accentSoft }}
-              title="Solo cuentas empresa pueden comprar al por mayor"
-            >
-              <Lock size={12} />
-              Solo empresas
-            </Link>
           )}
         </div>
       </div>

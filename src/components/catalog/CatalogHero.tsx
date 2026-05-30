@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { Search, Truck, ShieldCheck, Clock, FileText, Lock, Sparkles, X } from 'lucide-react'
+import { Search, Truck, ShieldCheck, Clock, FileText, Sparkles, X } from 'lucide-react'
 import CatalogModeTabs from './CatalogModeTabs'
 import type { UserRole } from '@/types/database'
 
@@ -12,8 +12,6 @@ type Props = {
   categoryCount: number
   search: string
   onSearchChange: (v: string) => void
-  /** Si false, mostramos banner "necesitas cuenta empresa". */
-  canPurchase: boolean
   /** Rol del usuario logueado (null = visitante anónimo). */
   userRole: UserRole | null
 }
@@ -64,7 +62,6 @@ export default function CatalogHero({
   categoryCount,
   search,
   onSearchChange,
-  canPurchase,
   userRole,
 }: Props) {
   const cfg = CONFIG[mode]
@@ -144,20 +141,18 @@ export default function CatalogHero({
         </div>
       </div>
 
-      <RoleBanner mode={mode} canPurchase={canPurchase} userRole={userRole} accent={cfg.accent} accentSoft={cfg.accentSoft} />
+      <RoleBanner mode={mode} userRole={userRole} accent={cfg.accent} accentSoft={cfg.accentSoft} />
     </section>
   )
 }
 
 function RoleBanner({
   mode,
-  canPurchase,
   userRole,
   accent,
   accentSoft,
 }: {
   mode: Mode
-  canPurchase: boolean
   userRole: UserRole | null
   accent: string
   accentSoft: string
@@ -184,49 +179,8 @@ function RoleBanner({
     )
   }
 
-  // /mayorista visitante o minorista: no puede comprar.
-  if (mode === 'mayorista' && !canPurchase) {
-    return (
-      <div
-        className="flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm"
-        style={{ background: accentSoft, borderColor: accent + '40' }}
-      >
-        <Lock size={18} className="shrink-0 mt-0.5" style={{ color: accent }} />
-        <div className="flex-1">
-          <p className="font-semibold" style={{ color: accent }}>
-            {userRole === 'minorista'
-              ? 'Solo cuentas empresa pueden comprar al por mayor'
-              : 'Para comprar a precios mayoristas necesitas una cuenta empresa'}
-          </p>
-          <p className="text-xs mt-0.5 text-gray-700">
-            Puedes navegar libremente para conocer precios y stock. Para añadir al carrito, regístrate como empresa.
-          </p>
-        </div>
-        {userRole === 'minorista' ? (
-          <a
-            href="https://wa.me/56954952395?text=Hola!%20Quiero%20cambiar%20mi%20cuenta%20a%20mayorista"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="shrink-0 text-xs font-semibold rounded-full px-3 py-1.5 text-white"
-            style={{ background: accent }}
-          >
-            Solicitar acceso
-          </a>
-        ) : (
-          <Link
-            href="/mayorista/registro"
-            className="shrink-0 text-xs font-semibold rounded-full px-3 py-1.5 text-white"
-            style={{ background: accent }}
-          >
-            Regístrate como empresa →
-          </Link>
-        )}
-      </div>
-    )
-  }
-
-  // /mayorista con permisos: confirmación discreta.
-  if (mode === 'mayorista' && canPurchase) {
+  // /mayorista: banner informativo de mínimo de pedido
+  if (mode === 'mayorista') {
     return (
       <div
         className="flex items-center gap-3 rounded-2xl border px-4 py-2.5 text-xs"
@@ -234,7 +188,8 @@ function RoleBanner({
       >
         <ShieldCheck size={16} />
         <p className="flex-1 font-semibold">
-          Compras con precios mayoristas {userRole === 'admin' && '· acceso admin'}
+          Precios al por mayor · Pedido mínimo $60.000
+          {userRole === 'admin' && ' · acceso admin'}
         </p>
       </div>
     )

@@ -12,10 +12,12 @@ type Body = {
   phone: string
   name: string
   notes?: string
+  is_mayorista?: boolean
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MAX_ITEMS = 50
+const MIN_MAYORISTA = 60_000
 
 export async function POST(req: NextRequest) {
   // Feature flag: WEBPAY_ENABLED=false desactiva el pago con tarjeta temporalmente
@@ -77,7 +79,7 @@ export async function POST(req: NextRequest) {
       .single()
     if (profile?.role) role = profile.role as UserRole
   }
-  const useWholesale = role === 'mayorista' || role === 'admin'
+  const useWholesale = role === 'mayorista' || role === 'admin' || body.is_mayorista === true
 
   const admin = createAdminClient()
 
@@ -139,14 +141,14 @@ export async function POST(req: NextRequest) {
     subtotal += unitPrice * qty
   }
 
-  if (zone) {
-    const minOrder = useWholesale ? zone.min_order_wholesale : zone.min_order
-    if (subtotal < minOrder) {
-      const falta = minOrder - subtotal
-      return NextResponse.json({
-        error: `Pedido mínimo $${minOrder.toLocaleString('es-CL')}. Te faltan $${falta.toLocaleString('es-CL')}.`,
-      }, { status: 400 })
-    }
+  const minOrder = useWholesale
+    ? MIN_MAYORISTA
+    : (zone?.min_order ?? 0)
+  if (subtotal < minOrder) {
+    const falta = minOrder - subtotal
+    return NextResponse.json({
+      error: `Pedido mínimo $${minOrder.toLocaleString('es-CL')}. Te faltan $${falta.toLocaleString('es-CL')}.`,
+    }, { status: 400 })
   }
 
   const total = subtotal + (zone?.delivery_price ?? 0)

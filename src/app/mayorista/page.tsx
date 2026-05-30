@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import CatalogClient from '@/components/catalog/CatalogClient'
 import Navbar from '@/components/catalog/Navbar'
 import CartDrawer from '@/components/catalog/CartDrawer'
-import type { Product, Category, UserRole } from '@/types/database'
+import type { Product, Category } from '@/types/database'
 
 export const revalidate = 60
 
@@ -11,10 +11,8 @@ type SearchParams = Promise<{ q?: string; cat?: string }>
 async function getData() {
   const supabase = await createClient()
 
-  const [{ data: products }, { data: categories }, { data: { user } }] = await Promise.all([
-    // En mayorista solo mostramos productos con precio_wholesale definido —
-    // si no, el ProductCard mostraría precio minorista bajo el header "Mayorista",
-    // que es confuso.
+  const [{ data: products }, { data: categories }] = await Promise.all([
+    // Solo productos con precio_wholesale definido — así todo lo visible tiene precio mayorista.
     supabase
       .from('products')
       .select('*, category:categories(*)')
@@ -23,29 +21,17 @@ async function getData() {
       .order('featured', { ascending: false })
       .order('name'),
     supabase.from('categories').select('*').order('order'),
-    supabase.auth.getUser(),
   ])
-
-  let role: UserRole | null = null
-  if (user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-    role = (profile?.role as UserRole) ?? 'minorista'
-  }
 
   return {
     products: (products as Product[]) ?? [],
     categories: (categories as Category[]) ?? [],
-    role,
   }
 }
 
 export default async function MayoristaPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams
-  const { products, categories, role } = await getData()
+  const { products, categories } = await getData()
   const initialCategory =
     params.cat === 'ofertas'
       ? 'ofertas'
@@ -62,7 +48,7 @@ export default async function MayoristaPage({ searchParams }: { searchParams: Se
           mode="mayorista"
           products={products}
           categories={categories}
-          userRole={role}
+          userRole={null}
           initialSearch={params.q ?? ''}
           initialCategory={initialCategory}
         />
