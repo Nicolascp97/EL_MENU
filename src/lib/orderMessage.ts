@@ -13,7 +13,7 @@ export type OrderForMessage = {
   name?:           string | null
   customer_type?:  'minorista' | 'mayorista' | null
   payment_method?: 'webpay' | 'transfer' | null
-  items:           { product_name: string; qty: number; unit: string; unit_price: number }[]
+  items:           { product_name: string; qty: number; unit: string; unit_price: number; unit_qty?: number | null }[]
 }
 
 /** Etiquetas legibles para el campo unit (lo que sale al cliente entre paréntesis). */
@@ -25,7 +25,15 @@ export const UNIT_LABELS: Record<string, string> = {
   bolsa:  'Bolsa',
   maceta: 'Maceta',
   caja:   'Caja',
-  gr:     'Gramos',
+  gr:     'gr',
+}
+
+/** Formatea la cantidad por unidad sin ceros decimales innecesarios:
+ *  1 → "1", 250 → "250", 1.5 → "1.5". */
+function formatUnitQty(n: number | null | undefined): string {
+  const v = n == null ? 1 : Number(n)
+  if (!Number.isFinite(v) || v <= 0) return '1'
+  return Number.isInteger(v) ? String(v) : String(v).replace(/\.?0+$/, '')
 }
 
 /** Formato pedido por el cliente: 92,900  (coma como separador de miles). */
@@ -39,13 +47,16 @@ export function catalogUrl(customerType?: string | null): string {
   return customerType === 'mayorista' ? `${base}/mayorista` : `${base}/catalogo`
 }
 
-/** Formato pedido por el cliente:  • 3 ALBAHACA (1 Paquete): CLP 3,000 */
+/** Formato pedido por el cliente:  • 3 ALBAHACA (1 Paquete): CLP 3,000
+ *  La presentación entre paréntesis usa unit_qty (cuánto va por unidad de
+ *  venta) + unit. Ej: Aceituna retail → "(250 gr)", mayorista → "(1 Kg)". */
 export function formatItems(items: OrderForMessage['items']): string {
   return items
     .map(i => {
       const label     = UNIT_LABELS[i.unit] ?? i.unit
+      const qtyLabel  = formatUnitQty(i.unit_qty)
       const lineTotal = i.qty * i.unit_price
-      return `• ${i.qty} ${i.product_name.toUpperCase()} (1 ${label}): CLP ${clp(lineTotal)}`
+      return `• ${i.qty} ${i.product_name.toUpperCase()} (${qtyLabel} ${label}): CLP ${clp(lineTotal)}`
     })
     .join('\n')
 }

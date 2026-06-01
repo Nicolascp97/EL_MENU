@@ -51,10 +51,12 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
       price:          editing.price,
       price_wholesale: editing.price_wholesale ?? null,
       category_id:    editing.category_id ?? null,
-      stock:          editing.stock ?? 0,
-      unit:           editing.unit ?? 'kg',
-      unit_wholesale: editing.unit_wholesale ?? null,
-      active:         editing.active ?? true,
+      stock:              editing.stock ?? 0,
+      unit:               editing.unit ?? 'kg',
+      unit_wholesale:     editing.unit_wholesale ?? null,
+      unit_qty:           editing.unit_qty ?? 1,
+      unit_qty_wholesale: editing.unit_qty_wholesale ?? null,
+      active:             editing.active ?? true,
       featured:       editing.featured ?? false,
       wholesale_only: editing.wholesale_only ?? false,
       images:         editing.images ?? [],
@@ -383,7 +385,19 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-[1fr_1fr] gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 mb-1 block">Cantidad minorista</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      placeholder="1"
+                      value={editing.unit_qty ?? 1}
+                      onChange={e => setEditing({ ...editing, unit_qty: Number(e.target.value) || 1 })}
+                    />
+                  </div>
                   <div>
                     <label className="text-xs font-medium text-gray-500 mb-1 block">Unidad minorista</label>
                     <select
@@ -395,6 +409,24 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
                         <option key={u} value={u}>{u}</option>
                       ))}
                     </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-[1fr_1fr] gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 mb-1 block">Cantidad mayorista</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                      placeholder="— igual que minorista —"
+                      value={editing.unit_qty_wholesale ?? ''}
+                      onChange={e => {
+                        const v = e.target.value
+                        setEditing({ ...editing, unit_qty_wholesale: v === '' ? null : Number(v) })
+                      }}
+                    />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-500 mb-1 block">Unidad mayorista</label>

@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
   const productIds = body.items.map(i => i.product_id)
   const { data: products, error: pErr } = await admin
     .from('products')
-    .select('id, name, price, price_wholesale, unit, unit_wholesale, stock, active, wholesale_only')
+    .select('id, name, price, price_wholesale, unit, unit_wholesale, unit_qty, unit_qty_wholesale, stock, active, wholesale_only')
     .in('id', productIds)
   if (pErr || !products) {
     return NextResponse.json({ error: 'No pude consultar los productos.' }, { status: 500 })
@@ -130,14 +130,19 @@ export async function POST(req: NextRequest) {
         error: `${p.name}: solo quedan ${p.stock} ${p.unit}.`,
       }, { status: 400 })
     }
-    const unitPrice = useWholesale && p.price_wholesale != null ? p.price_wholesale : p.price
-    const unitLabel = useWholesale && p.unit_wholesale ? p.unit_wholesale : p.unit
+    const unitPrice  = useWholesale && p.price_wholesale != null ? p.price_wholesale : p.price
+    const useMayPres = useWholesale && p.unit_wholesale
+    const unitLabel  = useMayPres ? p.unit_wholesale : p.unit
+    const unitQty    = useMayPres
+      ? (p.unit_qty_wholesale ?? p.unit_qty ?? 1)
+      : (p.unit_qty ?? 1)
     orderItems.push({
       product_id: p.id,
       product_name: p.name,
       qty,
       unit_price: unitPrice,
       unit: unitLabel,
+      unit_qty: Number(unitQty),
     })
     subtotal += unitPrice * qty
   }

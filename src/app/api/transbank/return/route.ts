@@ -24,7 +24,7 @@ type OrderRow = {
   address: string
   name?: string | null
   customer_type?: 'minorista' | 'mayorista' | null
-  items: { product_name: string; qty: number; unit: string; unit_price: number }[]
+  items: { product_name: string; qty: number; unit: string; unit_price: number; unit_qty?: number | null }[]
 }
 
 type OrderRowWithItems = OrderRow & { items: { product_id?: string; product_name: string; qty: number; unit: string }[] }

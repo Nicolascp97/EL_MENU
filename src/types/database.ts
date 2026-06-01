@@ -18,6 +18,8 @@ export type Product = {
   images: string[]
   unit: string
   unit_wholesale: string | null
+  unit_qty: number
+  unit_qty_wholesale: number | null
   active: boolean
   featured: boolean
   wholesale_only: boolean
@@ -46,6 +48,7 @@ export type OrderItem = {
   qty: number
   unit_price: number
   unit: string
+  unit_qty?: number
 }
 
 export type Order = {
