@@ -4,7 +4,10 @@ import Navbar from '@/components/catalog/Navbar'
 import CartDrawer from '@/components/catalog/CartDrawer'
 import type { Product, Category, UserRole } from '@/types/database'
 
-export const revalidate = 60
+// Sin cache: cada visita golpea la DB y muestra los datos actuales.
+// Necesario para que los cambios del panel admin (precios, stock, fotos,
+// unidades, etc.) se vean reflejados de inmediato en el catálogo público.
+export const dynamic = 'force-dynamic'
 
 type SearchParams = Promise<{ q?: string; cat?: string }>
 
