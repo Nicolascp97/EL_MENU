@@ -93,7 +93,7 @@ export default function CartDrawer() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm text-gray-900 truncate">{product.name}</p>
-                  <p className="text-xs text-gray-500">{formatPrice(itemPrice(product))} / {product.unit}</p>
+                  <p className="text-xs text-gray-500">{formatPrice(itemPrice(product))} / {cartMode === 'mayorista' && product.unit_wholesale ? product.unit_wholesale : product.unit}</p>
                   <div className="flex items-center gap-2 mt-1.5">
                     <button
                       onClick={() => updateQty(product.id, qty - 1)}
