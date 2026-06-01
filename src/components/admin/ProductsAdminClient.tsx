@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Product, Category } from '@/types/database'
 import { formatPrice } from '@/lib/utils'
-import { Pencil, Plus, ToggleLeft, ToggleRight, Star, Search, X, Package } from 'lucide-react'
+import { Pencil, Plus, ToggleLeft, ToggleRight, Star, Search, X, Package, Image as ImageIcon, Upload } from 'lucide-react'
 
 type Props = {
   initialProducts: Product[]
@@ -12,12 +12,15 @@ type Props = {
 
 const GREEN = '#1B2B1E'
 const ACCENT = '#E8621A'
+const UNIT_OPTIONS = ['kg', 'unid', 'ramo', 'bolsa', 'maceta', 'caja', 'paq', 'gr'] as const
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 export default function ProductsAdminClient({ initialProducts, categories }: Props) {
   const [products, setProducts] = useState<Product[]>(initialProducts)
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Partial<Product> | null>(null)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const supabase = createClient()
 
   const filtered = products.filter(p =>
@@ -50,6 +53,7 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
       category_id:    editing.category_id ?? null,
       stock:          editing.stock ?? 0,
       unit:           editing.unit ?? 'kg',
+      unit_wholesale: editing.unit_wholesale ?? null,
       active:         editing.active ?? true,
       featured:       editing.featured ?? false,
       wholesale_only: editing.wholesale_only ?? false,
@@ -76,6 +80,37 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
   async function updateStock(productId: string, stock: number) {
     setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock } : p))
     await supabase.from('products').update({ stock }).eq('id', productId)
+  }
+
+  /** Sube una foto al bucket product-images y la setea como única imagen del
+   *  producto en edición. Reemplaza la foto anterior (no acumula). */
+  async function uploadImage(file: File) {
+    if (!editing) return
+    if (file.size > MAX_IMAGE_BYTES) {
+      alert('La imagen no puede pesar más de 5 MB.')
+      return
+    }
+    if (!/^image\/(jpe?g|png|webp)$/.test(file.type)) {
+      alert('Formato no soportado. Usa JPG, PNG o WEBP.')
+      return
+    }
+    setUploading(true)
+    const ext      = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const baseName = editing.id ?? `new-${Date.now()}`
+    const path     = `${baseName}-${Date.now()}.${ext}`
+    const { error: upErr } = await supabase.storage
+      .from('product-images')
+      .upload(path, file, { contentType: file.type, upsert: true })
+    if (upErr) {
+      alert(`Error subiendo imagen: ${upErr.message}`)
+      setUploading(false)
+      return
+    }
+    const { data: { publicUrl } } = supabase.storage
+      .from('product-images')
+      .getPublicUrl(path)
+    setEditing(prev => (prev ? { ...prev, images: [publicUrl] } : prev))
+    setUploading(false)
   }
 
   return (
@@ -350,27 +385,41 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-medium text-gray-500 mb-1 block">Unidad</label>
+                    <label className="text-xs font-medium text-gray-500 mb-1 block">Unidad minorista</label>
                     <select
                       className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 bg-white"
                       value={editing.unit || 'kg'}
                       onChange={e => setEditing({ ...editing, unit: e.target.value })}
                     >
-                      {['kg', 'unid', 'ramo', 'bolsa', 'maceta', 'caja', 'paq', 'gr'].map(u => (
+                      {UNIT_OPTIONS.map(u => (
                         <option key={u} value={u}>{u}</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-500 mb-1 block">Stock inicial</label>
-                    <input
-                      type="number"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
-                      placeholder="0"
-                      value={editing.stock ?? 0}
-                      onChange={e => setEditing({ ...editing, stock: parseInt(e.target.value) || 0 })}
-                    />
+                    <label className="text-xs font-medium text-gray-500 mb-1 block">Unidad mayorista</label>
+                    <select
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 bg-white"
+                      value={editing.unit_wholesale ?? ''}
+                      onChange={e => setEditing({ ...editing, unit_wholesale: e.target.value || null })}
+                    >
+                      <option value="">— igual que minorista —</option>
+                      {UNIT_OPTIONS.map(u => (
+                        <option key={u} value={u}>{u}</option>
+                      ))}
+                    </select>
                   </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Stock inicial</label>
+                  <input
+                    type="number"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    placeholder="0"
+                    value={editing.stock ?? 0}
+                    onChange={e => setEditing({ ...editing, stock: parseInt(e.target.value) || 0 })}
+                  />
                 </div>
 
                 <div>
@@ -385,6 +434,50 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
                       <option key={c.id} value={c.id}>{c.emoji} {c.name}</option>
                     ))}
                   </select>
+                </div>
+
+                {/* Foto del producto */}
+                <div>
+                  <label className="text-xs font-medium text-gray-500 mb-1 block">Foto del producto</label>
+                  <div className="flex items-center gap-3">
+                    {editing.images && editing.images.length > 0 ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={editing.images[0]}
+                        alt=""
+                        className="w-16 h-16 rounded-xl object-cover border border-gray-200 shrink-0"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 shrink-0">
+                        <ImageIcon size={20} />
+                      </div>
+                    )}
+                    <label className="flex-1 cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        disabled={uploading}
+                        onChange={e => {
+                          const f = e.target.files?.[0]
+                          if (f) uploadImage(f)
+                          e.target.value = '' // permite re-elegir el mismo archivo
+                        }}
+                      />
+                      <span
+                        className="flex items-center justify-center gap-2 w-full text-center px-3 py-2.5 rounded-xl border-2 border-dashed border-gray-300 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                        style={{ opacity: uploading ? 0.6 : 1 }}
+                      >
+                        <Upload size={14} />
+                        {uploading
+                          ? 'Subiendo...'
+                          : editing.images?.length
+                            ? 'Reemplazar foto'
+                            : 'Subir foto'}
+                      </span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">JPG, PNG o WEBP · máx 5 MB</p>
                 </div>
 
                 {/* Toggles activo / destacado */}

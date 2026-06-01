@@ -17,6 +17,7 @@ export type Product = {
   stock: number
   images: string[]
   unit: string
+  unit_wholesale: string | null
   active: boolean
   featured: boolean
   wholesale_only: boolean
