@@ -6,6 +6,7 @@ import Navbar from '@/components/catalog/Navbar'
 import type { Order } from '@/types/database'
 import ConfirmarPedidoWhatsAppButton from './ConfirmarPedidoWhatsAppButton'
 import ClearCartOnConfirm from './ClearCartOnConfirm'
+import TransferReminderPopup from './TransferReminderPopup'
 
 export const dynamic = 'force-dynamic'
 
@@ -199,21 +200,17 @@ export default async function ConfirmacionPage({ searchParams }: { searchParams:
             </div>
           )}
 
+          {/* ── Popup recordatorio transferencia (aparece a los 3s) ── */}
+          {isTransfer && order && (
+            <TransferReminderPopup
+              orderId={order.id}
+              waNumber={process.env.NEXT_PUBLIC_WA_NUMBER ?? '56954952395'}
+            />
+          )}
+
           {/* ── Botones de acción ── */}
           <div className="mt-6 flex flex-col gap-2">
-            {isTransfer && (
-              <a
-                href={`https://wa.me/56954952395?text=${encodeURIComponent(
-                  `Hola! Realicé el pedido #${order?.id?.slice(0, 8).toUpperCase() ?? ''} y adjunto el comprobante de transferencia.`
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full text-center inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-full text-sm font-semibold text-white"
-                style={{ background: '#E8621A' }}
-              >
-                <Phone size={14} /> Enviar comprobante por WhatsApp
-              </a>
-            )}
+            {/* botón "Enviar comprobante" eliminado — reemplazado por el popup automático */}
 
             <Link
               href="/catalogo"
