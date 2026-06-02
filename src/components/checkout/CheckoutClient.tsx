@@ -48,7 +48,6 @@ export default function CheckoutClient({
   const router    = useRouter()
   const items     = useCart(s => s.items)
   const total     = useCart(s => s.total)
-  const clearCart = useCart(s => s.clearCart)
 
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -128,7 +127,8 @@ export default function CheckoutClient({
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data?.error ?? 'No se pudo registrar el pedido.')
-        clearCart()
+        // El carrito se limpia en la página de confirmación una vez registrado el
+        // pedido. Así, si la navegación falla, el cliente no pierde su carrito.
         router.push(`/checkout/confirmacion?status=transfer&orderId=${data.orderId}`)
         return
       }
@@ -150,8 +150,10 @@ export default function CheckoutClient({
       const data = await res.json()
       if (!res.ok) throw new Error(data?.error ?? 'No se pudo iniciar el pago.')
 
-      clearCart()
-
+      // IMPORTANTE: no limpiar el carrito acá. Si el cliente cancela o el pago
+      // falla en Webpay, vuelve con su carrito intacto y puede reintentar al
+      // toque. El carrito se limpia solo cuando el pago se confirma (status
+      // success) en la página de confirmación.
       const form  = document.createElement('form')
       form.method = 'POST'
       form.action = data.url

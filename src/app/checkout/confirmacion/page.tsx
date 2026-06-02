@@ -5,6 +5,7 @@ import { formatPrice } from '@/lib/utils'
 import Navbar from '@/components/catalog/Navbar'
 import type { Order } from '@/types/database'
 import ConfirmarPedidoWhatsAppButton from './ConfirmarPedidoWhatsAppButton'
+import ClearCartOnConfirm from './ClearCartOnConfirm'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,6 +71,7 @@ export default async function ConfirmacionPage({ searchParams }: { searchParams:
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <ClearCartOnConfirm status={status} />
       <Navbar />
       <main className="max-w-xl mx-auto px-4 py-12">
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
