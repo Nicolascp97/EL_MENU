@@ -203,7 +203,15 @@ export default async function ConfirmacionPage({ searchParams }: { searchParams:
           {/* ── Popup recordatorio transferencia (aparece a los 3s) ── */}
           {isTransfer && order && (
             <TransferReminderPopup
-              orderId={order.id}
+              order={{
+                id:             order.id,
+                total:          order.total,
+                address:        `${order.address}, ${order.commune}`,
+                name:           order.name,
+                customer_type:  order.customer_type,
+                payment_method: order.payment_method,
+                items:          order.items,
+              }}
               waNumber={process.env.NEXT_PUBLIC_WA_NUMBER ?? '56954952395'}
             />
           )}

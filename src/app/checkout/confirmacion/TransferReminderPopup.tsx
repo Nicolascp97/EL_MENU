@@ -1,13 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { X, MessageCircle } from 'lucide-react'
+import { buildCustomerWhatsAppMessage, type OrderForMessage } from '@/lib/orderMessage'
 
 type Props = {
-  orderId: string
+  order: OrderForMessage
   waNumber: string
 }
 
-export default function TransferReminderPopup({ orderId, waNumber }: Props) {
+export default function TransferReminderPopup({ order, waNumber }: Props) {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -17,8 +18,8 @@ export default function TransferReminderPopup({ orderId, waNumber }: Props) {
 
   if (!visible) return null
 
-  const shortId = orderId.slice(0, 8).toUpperCase()
-  const msg = `Hola! Realicé el pedido #${shortId} y adjunto el comprobante de transferencia.`
+  const shortId = order.id.slice(0, 8).toUpperCase()
+  const msg  = buildCustomerWhatsAppMessage(order)
   const href = `https://wa.me/${waNumber.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`
 
   return (
