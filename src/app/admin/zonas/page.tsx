@@ -208,35 +208,50 @@ export default function AdminZonasPage() {
 
                 {/* Communes */}
                 <div>
-                  <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 600, color: '#6B7A6F', textTransform: 'uppercase', letterSpacing: '.4px' }}>
-                    Comunas incluidas
-                  </p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: isEditing ? 10 : 0 }}>
-                    {(current.communes ?? []).map(c => (
-                      <span
-                        key={c}
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          background: '#F0FFF4', border: '1px solid #D8F3DC',
-                          borderRadius: 100, padding: '4px 10px', fontSize: 12, color: '#1F4B35',
-                        }}
-                      >
-                        {c}
-                        {isEditing && (
-                          <button
-                            onClick={() => removeCommune(zone.id, c)}
-                            style={{
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              width: 14, height: 14, borderRadius: '50%', border: 0,
-                              background: '#B7E4C7', color: '#1F4B35', cursor: 'pointer',
-                              fontSize: 11, lineHeight: 1, padding: 0, marginLeft: 2,
-                            }}
-                          >
-                            ×
-                          </button>
-                        )}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: '#6B7A6F', textTransform: 'uppercase', letterSpacing: '.4px' }}>
+                      Comunas incluidas
+                    </p>
+                    {(zone.mayorista_only_communes ?? []).length > 0 && (
+                      <span style={{ fontSize: 11, color: '#92400E' }}>
+                        ★ = solo mayoristas
                       </span>
-                    ))}
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: isEditing ? 10 : 0 }}>
+                    {(current.communes ?? []).map(c => {
+                      const isMayoristaOnly = (zone.mayorista_only_communes ?? []).includes(c)
+                      return (
+                        <span
+                          key={c}
+                          title={isMayoristaOnly ? 'Solo mayoristas' : undefined}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            background: isMayoristaOnly ? '#FFF7ED' : '#F0FFF4',
+                            border: `1px solid ${isMayoristaOnly ? '#FED7AA' : '#D8F3DC'}`,
+                            borderRadius: 100, padding: '4px 10px', fontSize: 12,
+                            color: isMayoristaOnly ? '#92400E' : '#1F4B35',
+                          }}
+                        >
+                          {isMayoristaOnly && <span style={{ fontSize: 10 }}>★</span>}
+                          {c}
+                          {isEditing && (
+                            <button
+                              onClick={() => removeCommune(zone.id, c)}
+                              style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                width: 14, height: 14, borderRadius: '50%', border: 0,
+                                background: isMayoristaOnly ? '#FED7AA' : '#B7E4C7',
+                                color: isMayoristaOnly ? '#92400E' : '#1F4B35',
+                                cursor: 'pointer', fontSize: 11, lineHeight: 1, padding: 0, marginLeft: 2,
+                              }}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </span>
+                      )
+                    })}
                     {(current.communes ?? []).length === 0 && (
                       <span style={{ fontSize: 12, color: '#9DC4AA' }}>Sin comunas</span>
                     )}

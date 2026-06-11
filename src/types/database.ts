@@ -30,6 +30,7 @@ export type Zone = {
   id: string
   name: string
   communes: string[]
+  mayorista_only_communes: string[]
   delivery_price: number
   min_order: number
   min_order_wholesale: number

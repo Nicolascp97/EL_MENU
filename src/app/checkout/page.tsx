@@ -36,7 +36,15 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Sea
     userRole = (profile?.role as UserRole) ?? 'minorista'
   }
 
-  const { data: zones } = await supabase.from('zones').select('*').order('name')
+  const { data: rawZones } = await supabase.from('zones').select('*').order('name')
+
+  // Para minoristas, ocultar comunas marcadas como exclusivas de mayoristas
+  const canSeeMayoristaZones = isMayorista || userRole !== 'minorista'
+  const zones = (rawZones as Zone[] ?? []).map(z =>
+    canSeeMayoristaZones
+      ? z
+      : { ...z, communes: z.communes.filter(c => !(z.mayorista_only_communes ?? []).includes(c)) }
+  )
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -52,7 +60,7 @@ export default async function CheckoutPage({ searchParams }: { searchParams: Sea
         </header>
 
         <CheckoutClient
-          zones={(zones as Zone[]) ?? []}
+          zones={zones}
           userRole={userRole}
           isMayorista={isMayorista}
           initialName={initialName}
