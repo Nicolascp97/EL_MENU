@@ -50,14 +50,25 @@ function formatUnitQty(n: number | null | undefined): string {
   return Number.isInteger(v) ? String(v) : String(v).replace(/\.?0+$/, '')
 }
 
-/** "3 Paquetes" | "2 × 250 gr" | "4 Kg" */
-function formatQtyLabel(qty: number, unit: string, unit_qty: number | null | undefined): string {
-  const uqVal     = Number(unit_qty ?? 1)
-  const hasSubQty = Number.isFinite(uqVal) && uqVal > 0 && uqVal !== 1
-  if (hasSubQty) {
-    return `${qty} × ${formatUnitQty(unit_qty)} ${UNIT_LABELS[unit] ?? unit}`
+/**
+ * Devuelve la descripción de unidad/presentación del producto.
+ *
+ * Hay dos tipos de `unit` en la base de datos:
+ *  A) Clave limpia ('kg', 'gr', 'paq', 'unid'...) con UNIT_LABELS
+ *     unit='gr', unit_qty=250  → "250 gr"
+ *     unit='kg', unit_qty=1   → "Kg"  /  qty=3 → "Kg" (qty va antes del nombre)
+ *  B) String descriptivo ('200 gr', '3 unid', '1 kg'...) → se muestra tal cual
+ *     unit='200 gr'           → "200 gr"
+ */
+function formatUnitInfo(qty: number, unit: string, unit_qty: number | null | undefined): string {
+  if (UNIT_LABELS[unit]) {
+    const uqVal     = Number(unit_qty ?? 1)
+    const hasSubQty = Number.isFinite(uqVal) && uqVal > 0 && uqVal !== 1
+    if (hasSubQty) return `${formatUnitQty(unit_qty)} ${UNIT_LABELS[unit]}`
+    return getUnitLabel(unit, qty)
   }
-  return `${qty} ${getUnitLabel(unit, qty)}`
+  // unit es un string descriptivo que ya incluye la cantidad por unidad
+  return unit
 }
 
 /** Formato pedido por el cliente: 92,900  (coma como separador de miles). */
@@ -71,16 +82,19 @@ export function catalogUrl(customerType?: string | null): string {
   return customerType === 'mayorista' ? `${base}/mayorista` : `${base}/catalogo`
 }
 
-/** Formato de cada ítem del pedido.
- *  Ejemplos: "• TOMATE — 2 Kg: CLP 1,600"
- *            "• ALBAHACA — 3 Paquetes: CLP 3,000"
- *            "• ACEITUNA — 2 × 250 gr: CLP 2,000" */
+/**
+ * Formato de cada ítem: cantidad ANTES del nombre, unidad después del guion.
+ *   "• 2 PALTA HASS GRANDE — 1 kg: CLP 7,600"
+ *   "• 1 CHAMPIÑÓN 200G — 200 gr: CLP 1,990"
+ *   "• 1 PICKLE ESPECIAL — 250 gr: CLP 1,800"
+ *   "• 3 ALBAHACA — Paquetes: CLP 3,000"
+ */
 export function formatItems(items: OrderForMessage['items']): string {
   return items
     .map(i => {
-      const lineTotal  = i.qty * i.unit_price
-      const qtyDisplay = formatQtyLabel(i.qty, i.unit, i.unit_qty)
-      return `• ${i.product_name.toUpperCase()} — ${qtyDisplay}: CLP ${clp(lineTotal)}`
+      const lineTotal = i.qty * i.unit_price
+      const unitInfo  = formatUnitInfo(i.qty, i.unit, i.unit_qty)
+      return `• ${i.qty} ${i.product_name.toUpperCase()} — ${unitInfo}: CLP ${clp(lineTotal)}`
     })
     .join('\n')
 }
