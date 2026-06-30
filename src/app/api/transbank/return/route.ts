@@ -158,6 +158,20 @@ async function handleReturn(req: Request): Promise<Response> {
     const authorized =
       result?.response_code === 0 && String(result?.status).toUpperCase() === 'AUTHORIZED'
 
+    // Registrar el motivo exacto cuando Transbank rechaza la tarjeta.
+    // response_code: 0 = aprobado · negativo = rechazo del banco/tarjeta
+    //   (-1 rechazo, -2 reintentar, -3 error, -4 rechazo, -5 posible fraude...).
+    // Esto NO es una falla nuestra: queda logueado para poder explicarle al
+    // cliente por qué su pago no pasó (buscar "[Transbank] Pago RECHAZADO").
+    if (!authorized) {
+      console.error(
+        `[Transbank] Pago RECHAZADO order=${existingOrder.id} ` +
+        `response_code=${result?.response_code ?? 'n/a'} ` +
+        `status=${result?.status ?? 'n/a'} ` +
+        `monto=${result?.amount ?? 'n/a'}`,
+      )
+    }
+
     // 2. Verificar que el monto coincida
     if (authorized && result.amount !== existingOrder.total) {
       console.error(`[Transbank] Monto no coincide: esperado ${existingOrder.total}, recibido ${result.amount}. Order: ${existingOrder.id}`)
