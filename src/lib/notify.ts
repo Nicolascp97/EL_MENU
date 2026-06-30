@@ -38,14 +38,20 @@ async function sendToN8n(event: string, data: Record<string, unknown>): Promise<
   const base   = process.env.N8N_WEBHOOK_BASE_URL
   const secret = process.env.N8N_WEBHOOK_SECRET
   if (!base || !secret) {
-    console.log(`[notify] n8n no configurado. Evento omitido: ${event}`, data)
+    // Antes esto era console.log y pasaba desapercibido. Ahora es error visible:
+    // si falta la config, NINGÚN aviso se manda y hay que enterarse.
+    console.error(
+      `[notify] n8n NO configurado (falta N8N_WEBHOOK_BASE_URL o N8N_WEBHOOK_SECRET). ` +
+      `Aviso PERDIDO para evento "${event}".`,
+      data,
+    )
     return
   }
   const url = `${base.replace(/\/$/, '')}/${WEBHOOK_PATH}`
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
   try {
-    await fetch(url, {
+    const res = await fetch(url, {
       method:  'POST',
       headers: {
         'Content-Type':    'application/json',
@@ -54,8 +60,28 @@ async function sendToN8n(event: string, data: Record<string, unknown>): Promise<
       body:   JSON.stringify({ event, ...data }),
       signal: controller.signal,
     })
-  } catch {
-    // No crítico — la operación original ya fue exitosa
+    if (!res.ok) {
+      // n8n respondió pero con error (workflow caído, secreto malo, 4xx/5xx).
+      // El pedido ya se guardó; dejamos rastro para no tener pedidos "fantasma".
+      const body = await res.text().catch(() => '')
+      console.error(
+        `[notify] n8n respondió ${res.status} para evento "${event}". El aviso NO se envió.`,
+        { url, status: res.status, body: body.slice(0, 500) },
+      )
+    } else {
+      console.log(`[notify] aviso "${event}" enviado a n8n OK (${res.status}).`)
+    }
+  } catch (err) {
+    // Timeout o error de red: típicamente n8n caído / suspendido por falta de pago.
+    // No es crítico para el pedido (ya quedó guardado), pero AHORA queda registrado
+    // como error en los logs de Vercel para poder detectarlo.
+    const reason = err instanceof Error && err.name === 'AbortError'
+      ? `timeout tras ${TIMEOUT_MS}ms (n8n no respondió)`
+      : (err instanceof Error ? err.message : String(err))
+    console.error(
+      `[notify] FALLO enviando evento "${event}" a n8n (${reason}). El aviso NO se envió.`,
+      { url },
+    )
   } finally {
     clearTimeout(timer)
   }

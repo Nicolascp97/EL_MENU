@@ -433,6 +433,9 @@ function OrderCard({ order, updating, onUpdateStatus }: {
   const isWA = order.channel === 'whatsapp'
   const isCancellable = order.status !== 'entregado' && order.status !== 'cancelado'
   const [confirming, setConfirming] = useState(false)
+  const [showAll, setShowAll] = useState(false)
+  const items = order.items as { product_name: string; qty: number; unit: string; unit_price: number }[]
+  const extraCount = items.length - 3
 
   function handleCancelClick() {
     if (!confirming) { setConfirming(true); return }
@@ -468,16 +471,43 @@ function OrderCard({ order, updating, onUpdateStatus }: {
 
       {/* Items */}
       <div style={{ borderTop: '1px solid #F0F7F1', paddingTop: 8, marginBottom: 10 }}>
-        {(order.items as { product_name: string; qty: number; unit: string; unit_price: number }[]).slice(0, 3).map((item, i) => (
-          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6B7A6F', lineHeight: 1.7 }}>
+        {(showAll ? items : items.slice(0, 3)).map((item, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6B7A6F', lineHeight: 1.7, gap: 8 }}>
             <span>{item.product_name} × {item.qty} {item.unit}</span>
-            <span>{formatPrice(item.unit_price * item.qty)}</span>
+            <span style={{ whiteSpace: 'nowrap' }}>{formatPrice(item.unit_price * item.qty)}</span>
           </div>
         ))}
-        {(order.items as unknown[]).length > 3 && (
-          <p style={{ margin: 0, fontSize: 11, color: '#9DC4AA' }}>
-            +{(order.items as unknown[]).length - 3} producto{(order.items as unknown[]).length - 3 !== 1 ? 's' : ''} más
-          </p>
+
+        {extraCount > 0 && (
+          <button
+            onClick={() => setShowAll(v => !v)}
+            style={{
+              margin: '6px 0 0', padding: 0, background: 'none', border: 'none',
+              color: '#2D6A4F', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+            }}
+          >
+            {showAll ? '▲ Ver menos' : `▼ Ver ${extraCount} producto${extraCount !== 1 ? 's' : ''} más`}
+          </button>
+        )}
+
+        {/* Detalle completo al expandir: nota + estado de pago */}
+        {showAll && (
+          <div style={{
+            marginTop: 8, paddingTop: 8, borderTop: '1px dashed #E8F1E9',
+            fontSize: 11, color: '#6B7A6F', lineHeight: 1.7,
+          }}>
+            {order.notes && (
+              <p style={{ margin: '0 0 2px' }}>📝 <strong>Nota:</strong> {order.notes}</p>
+            )}
+            <p style={{ margin: 0 }}>
+              💳 <strong>Pago:</strong>{' '}
+              {order.payment_method === 'transfer' ? 'Transferencia'
+                : order.payment_method === 'webpay' ? 'Webpay' : '—'}
+              {' · '}
+              {order.payment_status === 'pagado' ? '✅ Pagado'
+                : order.payment_status === 'fallido' ? '❌ Fallido' : '⏳ Pendiente'}
+            </p>
+          </div>
         )}
       </div>
 
