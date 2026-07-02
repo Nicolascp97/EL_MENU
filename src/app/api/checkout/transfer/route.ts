@@ -32,7 +32,10 @@ function checkTransferRateLimit(ip: string): boolean {
 
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const MAX_ITEMS = 50
+// Máximo de PRODUCTOS DISTINTOS en el carrito (no cuenta cantidades). Un pedido
+// mayorista puede incluir buena parte del catálogo (~144 productos), así que el
+// tope es holgado; solo protege contra payloads absurdos.
+const MAX_ITEMS = 200
 const MIN_MAYORISTA = 60_000
 
 export async function POST(req: NextRequest) {
@@ -61,7 +64,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.items.length > MAX_ITEMS) {
-    return NextResponse.json({ error: 'Demasiados productos en el carrito.' }, { status: 400 })
+    return NextResponse.json({ error: `El carrito supera el máximo de ${MAX_ITEMS} productos distintos.` }, { status: 400 })
   }
   if (body.items.some(i => !UUID_RE.test(i.product_id))) {
     return NextResponse.json({ error: 'Producto inválido.' }, { status: 400 })
