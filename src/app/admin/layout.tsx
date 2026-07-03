@@ -39,6 +39,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             amount={subscription.amountClp}
             nextDueDate={subscription.nextDueDate}
             payLink={payLink}
+            monthsOwed={subscription.monthsOwed}
+            amountOwed={subscription.amountOwed}
           />
         )}
         {children}

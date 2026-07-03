@@ -14,10 +14,12 @@ import { createAdminClient } from './supabase/admin'
 export type SubscriptionState = 'active' | 'grace' | 'overdue'
 
 export interface SubscriptionInfo {
-  nextDueDate:  string          // 'YYYY-MM-DD'
-  amountClp:    number
+  nextDueDate:  string          // 'YYYY-MM-DD' — vencimiento del período impago más antiguo
+  amountClp:    number          // valor de UN mes
   state:        SubscriptionState
   daysUntilDue: number          // >0 faltan días · 0 vence hoy · <0 vencido
+  monthsOwed:   number          // meses acumulados sin pagar (0 si está al día)
+  amountOwed:   number          // monthsOwed * amountClp (deuda total acumulada)
 }
 
 // 'YYYY-MM-DD' del día de hoy en Chile.
@@ -52,6 +54,19 @@ export function computeStatus(nextDueDate: string): {
   return { state, daysUntilDue }
 }
 
+/**
+ * Meses de suscripción acumulados sin pagar. Como el vencimiento cae siempre el
+ * día 1, contamos los períodos mensuales transcurridos desde nextDueDate hasta hoy.
+ *   due=jul, hoy=jul → 1 (debe julio) · hoy=ago → 2 (julio+agosto) · etc.
+ *   hoy anterior al vencimiento → 0 (aún no debe nada).
+ */
+export function computeMonthsOwed(nextDueDate: string): number {
+  const [dueY, dueM] = nextDueDate.split('-').map(Number)
+  const [todY, todM] = todayInSantiago().split('-').map(Number)
+  const diff = (todY * 12 + todM) - (dueY * 12 + dueM) + 1
+  return Math.max(0, diff)
+}
+
 /** Lee la suscripción. Devuelve null si no existe o hay error (el layout hace fail-open). */
 export async function getSubscription(): Promise<SubscriptionInfo | null> {
   const sb = createAdminClient()
@@ -64,11 +79,14 @@ export async function getSubscription(): Promise<SubscriptionInfo | null> {
   if (error || !data) return null
 
   const { state, daysUntilDue } = computeStatus(data.next_due_date)
+  const monthsOwed = computeMonthsOwed(data.next_due_date)
   return {
     nextDueDate:  data.next_due_date,
     amountClp:    data.amount_clp,
     state,
     daysUntilDue,
+    monthsOwed,
+    amountOwed:   monthsOwed * data.amount_clp,
   }
 }
 

@@ -16,9 +16,10 @@ CREATE TABLE IF NOT EXISTS subscription (
   CONSTRAINT subscription_single_row CHECK (id = 1)
 );
 
--- Seed: próximo vencimiento 1 de agosto de 2026, monto $20.500.
+-- Seed: primer vencimiento 1 de julio de 2026, monto $20.500.
+-- (El vencimiento es siempre el día 1; la deuda se acumula mes a mes si no se paga.)
 INSERT INTO subscription (id, next_due_date, amount_clp)
-VALUES (1, '2026-08-01', 20500)
+VALUES (1, '2026-07-01', 20500)
 ON CONFLICT (id) DO NOTHING;
 
 -- RLS activo, sin políticas → solo el service role accede (bypassa RLS).

@@ -29,18 +29,23 @@ export default function SubscriptionNotice({
   amount,
   nextDueDate,
   payLink,
+  monthsOwed,
+  amountOwed,
 }: {
   state: SubscriptionState
   daysUntilDue: number
   amount: number
   nextDueDate: string
   payLink: string
+  monthsOwed: number
+  amountOwed: number
 }) {
   // Cierre local: para banners cerrables y para el modal (persistido por sesión + vencimiento).
   const dismissKey = `elmenu_sub_dismiss_${nextDueDate}`
   const [dismissed, setDismissed] = useState(false)
 
   const overdueDays = Math.abs(daysUntilDue)
+  const multiMonth = monthsOwed >= 2
 
   // ─── Modal insistente (overdue ≥ +6) ─────────────────────────────────────
   if (state === 'overdue') {
@@ -72,11 +77,17 @@ export default function SubscriptionNotice({
             fontFamily: "'Fraunces', Georgia, serif", fontWeight: 700, fontSize: 20,
             color: '#1B2B1E', margin: '0 0 8px',
           }}>
-            Tu plan está vencido
+            {multiMonth ? 'Tienes pagos pendientes' : 'Tu plan está vencido'}
           </h2>
           <p style={{ color: '#4B5563', fontSize: 14, lineHeight: 1.6, margin: '0 0 20px' }}>
-            Han pasado <strong>{overdueDays} días</strong> desde el vencimiento. Para evitar
-            la suspensión del servicio, regulariza tu pago de <strong>{clp(amount)}</strong> ahora.
+            {multiMonth ? (
+              <>Tienes <strong>{monthsOwed} meses pendientes</strong> de pago
+              (<strong>{clp(amountOwed)}</strong> en total). Regulariza tu suscripción para
+              no perder el servicio.</>
+            ) : (
+              <>Han pasado <strong>{overdueDays} días</strong> desde el vencimiento. Para evitar
+              la suspensión del servicio, regulariza tu pago de <strong>{clp(amount)}</strong> ahora.</>
+            )}
           </p>
           <a
             href={payLink}
@@ -84,12 +95,17 @@ export default function SubscriptionNotice({
             rel="noopener noreferrer"
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              width: '100%', padding: '13px 0', borderRadius: 10, background: '#E8621A',
+              width: '100%', padding: '13px 0', borderRadius: 10, background: '#DC2626',
               color: '#fff', fontWeight: 700, fontSize: 15, textDecoration: 'none',
             }}
           >
-            <CreditCard size={18} /> Pagar {clp(amount)}
+            <CreditCard size={18} /> Pagar {clp(amount)}{multiMonth ? ' / mes' : ''}
           </a>
+          {multiMonth && (
+            <p style={{ color: '#9CA3AF', fontSize: 11.5, lineHeight: 1.5, margin: '10px 0 0' }}>
+              El pago es de {clp(amount)} por mes. Repite el pago por cada mes pendiente.
+            </p>
+          )}
           <button
             onClick={() => {
               try { sessionStorage.setItem(dismissKey, '1') } catch {}
@@ -114,9 +130,10 @@ export default function SubscriptionNotice({
   let closable = true
 
   if (state === 'grace') {
-    bg = '#FEF2F2'; border = '#FCA5A5'; fg = '#991B1B'; closable = false
+    // Naranjo (aún no rojo): venció pero está dentro de los 5 días de gracia.
+    bg = '#FFF7ED'; border = '#FDBA74'; fg = '#9A3412'; closable = false
     icon = <AlertTriangle size={18} />
-    text = <>Tu plan está <strong>vencido hace {overdueDays} día{overdueDays !== 1 ? 's' : ''}</strong>. Regulariza los {clp(amount)} a la brevedad.</>
+    text = <>Tu plan está <strong>vencido hace {overdueDays} día{overdueDays !== 1 ? 's' : ''}</strong>. Regulariza los {clp(amount)} antes de que se suspenda el servicio.</>
   } else if (daysUntilDue === 0) {
     bg = '#FFF7ED'; border = '#FDBA74'; fg = '#9A3412'
     icon = <Clock size={18} />
