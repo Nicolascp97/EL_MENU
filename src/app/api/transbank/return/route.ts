@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createWebpayPlus } from '@/lib/transbank'
 import { notifyPedidoWebpay, notifyStockBajo } from '@/lib/notify'
@@ -209,23 +209,26 @@ async function handleReturn(req: Request): Promise<Response> {
       .maybeSingle()
 
     if (authorized && order) {
-      notifyPedidoWebpay(order as OrderRow).catch(() => {})
-
-      // Alerta de stock bajo: productos con ≤5 unidades tras el pedido
+      // Avisos al dueño DENTRO de `after()`. Antes iban sueltos justo antes del
+      // redirect: Vercel congela la función apenas responde, así que el fetch a
+      // n8n moría a medio vuelo y el pedido pagado no llegaba nunca al WhatsApp.
+      // `after()` mantiene viva la invocación hasta terminar de avisar.
       const productIds = (order.items as { product_id?: string }[])
         .map(i => i.product_id)
         .filter(Boolean) as string[]
 
-      if (productIds.length) {
-        admin.from('products')
-          .select('name, stock, unit')
-          .in('id', productIds)
-          .lte('stock', 5)
-          .then(
-            ({ data }) => { if (data?.length) notifyStockBajo(data).catch(() => {}) },
-            () => {}
-          )
-      }
+      after(async () => {
+        await notifyPedidoWebpay(order as OrderRow)
+
+        // Alerta de stock bajo: productos con ≤5 unidades tras el pedido
+        if (productIds.length) {
+          const { data } = await admin.from('products')
+            .select('name, stock, unit')
+            .in('id', productIds)
+            .lte('stock', 5)
+          if (data?.length) await notifyStockBajo(data)
+        }
+      })
     }
 
     return NextResponse.redirect(
@@ -240,6 +243,10 @@ async function handleReturn(req: Request): Promise<Response> {
     return NextResponse.redirect(`${appUrl}/checkout/confirmacion?status=error`, { status: 303 })
   }
 }
+
+// Los avisos a n8n corren en `after()`, con hasta 3 intentos (≈24s en el peor
+// caso). El default de Vercel no alcanza si n8n está lento.
+export const maxDuration = 30
 
 // Transbank usa POST en producción, pero en integración puede redirigir con GET
 export const POST = handleReturn

@@ -1,7 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { notifyMayoristaAprobado } from '@/lib/notify'
+
+// El aviso a n8n corre en `after()`, con hasta 3 intentos (≈24s en el peor caso).
+export const maxDuration = 30
 
 /** Verifica que el caller sea admin. */
 async function verifyAdmin() {
@@ -179,10 +182,11 @@ export async function PATCH(req: Request) {
     // Notificar a Celso que la aprobación fue exitosa
     const { data: authUser } = await admin.auth.admin.getUserById(userId)
     if (authUser.user) {
-      notifyMayoristaAprobado({
-        name:  nameFromUser(authUser.user),
-        email: authUser.user.email ?? '',
-      }).catch(() => {})
+      const name  = nameFromUser(authUser.user)
+      const email = authUser.user.email ?? ''
+      // `after()` y no fire-and-forget: sin él la función se congela al responder
+      // y el fetch a n8n queda a medio vuelo.
+      after(() => notifyMayoristaAprobado({ name, email }))
     }
 
   } else {

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { checkOrigin } from '@/lib/csrf'
@@ -37,6 +37,10 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // tope es holgado; solo protege contra payloads absurdos.
 const MAX_ITEMS = 200
 const MIN_MAYORISTA = 60_000
+
+// Los avisos a n8n corren en `after()`, con hasta 3 intentos (≈24s en el peor
+// caso). El default de Vercel no alcanza si n8n está lento.
+export const maxDuration = 30
 
 export async function POST(req: NextRequest) {
   const csrfError = checkOrigin(req)
@@ -191,19 +195,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No pude crear el pedido.' }, { status: 500 })
   }
 
-  // Notificar nuevo pedido
-  notifyPedidoTransferencia(order).catch(() => {})
-
-  // Alerta de stock bajo: productos con ≤5 unidades después del pedido
+  // Avisos al dueño. Van dentro de `after()`: en Vercel la función serverless se
+  // congela apenas se devuelve la respuesta, así que un fetch "fire and forget"
+  // se queda a medio camino y el WhatsApp nunca sale. `after()` extiende la vida
+  // de la invocación (waitUntil) hasta que estos avisos terminen.
   const updatedIds = orderItems.map(i => i.product_id)
-  admin.from('products')
-    .select('name, stock, unit')
-    .in('id', updatedIds)
-    .lte('stock', 5)
-    .then(
-      ({ data }) => { if (data?.length) notifyStockBajo(data).catch(() => {}) },
-      () => {}
-    )
+  after(async () => {
+    await notifyPedidoTransferencia(order)
+
+    // Alerta de stock bajo: productos con ≤5 unidades después del pedido
+    const { data } = await admin.from('products')
+      .select('name, stock, unit')
+      .in('id', updatedIds)
+      .lte('stock', 5)
+    if (data?.length) await notifyStockBajo(data)
+  })
 
   return NextResponse.json({ ok: true, orderId: order.id })
 }

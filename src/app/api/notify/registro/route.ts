@@ -1,5 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { notifyRegistroMayorista } from '@/lib/notify'
+
+// El aviso a n8n corre en `after()`, con hasta 3 intentos (≈24s en el peor caso).
+export const maxDuration = 30
 
 /**
  * POST /api/notify/registro
@@ -12,8 +15,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Faltan datos' }, { status: 400 })
     }
 
+    // Fuera del ciclo de respuesta: el usuario que se registra no tiene por qué
+    // esperar a que n8n conteste, pero el aviso sí debe completarse.
     if (tipo === 'mayorista') {
-      await notifyRegistroMayorista({ name, email, phone })
+      after(() => notifyRegistroMayorista({ name, email, phone }))
     }
     // Registros minoristas no generan notificación (solo mayoristas son relevantes)
 

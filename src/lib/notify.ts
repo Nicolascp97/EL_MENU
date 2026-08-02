@@ -12,8 +12,16 @@
 
 import { clp, shortId, catalogUrl, formatItems } from './orderMessage'
 
-const TIMEOUT_MS = 6_000
+const TIMEOUT_MS = 7_000
 const WEBHOOK_PATH = 'elmenu-notificaciones'
+/** Intentos totales por aviso. n8n cloud a veces tarda en despertar el workflow
+ *  y devuelve 5xx o corta la conexión en el primer POST. */
+const MAX_ATTEMPTS = 3
+/** Espera antes del intento 2 y del 3. Peor caso total: 3×7s + 3s ≈ 24s,
+ *  por eso las rutas que notifican declaran `maxDuration = 30`. */
+const BACKOFF_MS = [1_000, 2_000]
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 type OrderRow = {
   id:            string
@@ -48,43 +56,57 @@ async function sendToN8n(event: string, data: Record<string, unknown>): Promise<
     return
   }
   const url = `${base.replace(/\/$/, '')}/${WEBHOOK_PATH}`
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-  try {
-    const res = await fetch(url, {
-      method:  'POST',
-      headers: {
-        'Content-Type':    'application/json',
-        'x-webhook-secret': secret,
-      },
-      body:   JSON.stringify({ event, ...data }),
-      signal: controller.signal,
-    })
-    if (!res.ok) {
-      // n8n respondió pero con error (workflow caído, secreto malo, 4xx/5xx).
-      // El pedido ya se guardó; dejamos rastro para no tener pedidos "fantasma".
-      const body = await res.text().catch(() => '')
+  const body = JSON.stringify({ event, ...data })
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+    try {
+      const res = await fetch(url, {
+        method:  'POST',
+        headers: {
+          'Content-Type':    'application/json',
+          'x-webhook-secret': secret,
+        },
+        body,
+        signal: controller.signal,
+      })
+      if (res.ok) {
+        console.log(`[notify] aviso "${event}" enviado a n8n OK (${res.status}, intento ${attempt}).`)
+        return
+      }
+      // n8n respondió pero con error (workflow inactivo, secreto malo, 4xx/5xx).
+      // Los 4xx no se arreglan reintentando: se aborta de inmediato.
+      const text = await res.text().catch(() => '')
+      const fatal = res.status >= 400 && res.status < 500
       console.error(
-        `[notify] n8n respondió ${res.status} para evento "${event}". El aviso NO se envió.`,
-        { url, status: res.status, body: body.slice(0, 500) },
+        `[notify] n8n respondió ${res.status} para evento "${event}" (intento ${attempt}/${MAX_ATTEMPTS}).` +
+        (fatal ? ' Error de configuración, no se reintenta.' : ''),
+        { url, status: res.status, body: text.slice(0, 500) },
       )
-    } else {
-      console.log(`[notify] aviso "${event}" enviado a n8n OK (${res.status}).`)
+      if (fatal) return
+    } catch (err) {
+      // Timeout o error de red: típicamente n8n dormido, caído o suspendido.
+      const reason = err instanceof Error && err.name === 'AbortError'
+        ? `timeout tras ${TIMEOUT_MS}ms (n8n no respondió)`
+        : (err instanceof Error ? err.message : String(err))
+      console.error(
+        `[notify] fallo enviando evento "${event}" a n8n (${reason}, intento ${attempt}/${MAX_ATTEMPTS}).`,
+        { url },
+      )
+    } finally {
+      clearTimeout(timer)
     }
-  } catch (err) {
-    // Timeout o error de red: típicamente n8n caído / suspendido por falta de pago.
-    // No es crítico para el pedido (ya quedó guardado), pero AHORA queda registrado
-    // como error en los logs de Vercel para poder detectarlo.
-    const reason = err instanceof Error && err.name === 'AbortError'
-      ? `timeout tras ${TIMEOUT_MS}ms (n8n no respondió)`
-      : (err instanceof Error ? err.message : String(err))
-    console.error(
-      `[notify] FALLO enviando evento "${event}" a n8n (${reason}). El aviso NO se envió.`,
-      { url },
-    )
-  } finally {
-    clearTimeout(timer)
+
+    if (attempt < MAX_ATTEMPTS) await sleep(BACKOFF_MS[attempt - 1])
   }
+
+  // Se agotaron los intentos. El pedido ya está guardado en la DB y visible en
+  // /admin; lo único que se perdió es el aviso por WhatsApp.
+  console.error(
+    `[notify] AVISO PERDIDO: evento "${event}" no llegó a n8n tras ${MAX_ATTEMPTS} intentos.`,
+    data,
+  )
 }
 
 // ─── 1. Nuevo pedido por TRANSFERENCIA ───────────────────────────────────────
