@@ -1,9 +1,8 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Product, Category } from '@/types/database'
-import { formatPrice } from '@/lib/utils'
-import { Pencil, Plus, ToggleLeft, ToggleRight, Star, Search, X, Package, Image as ImageIcon, Upload } from 'lucide-react'
+import { Pencil, Plus, ToggleLeft, ToggleRight, Star, Search, X, Package, Image as ImageIcon, Upload, Check, AlertCircle } from 'lucide-react'
 
 type Props = {
   initialProducts: Product[]
@@ -15,33 +14,161 @@ const ACCENT = '#E8621A'
 const UNIT_OPTIONS = ['kg', 'unid', 'ramo', 'bolsa', 'maceta', 'caja', 'paq', 'gr'] as const
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
+/** Mensaje para el caso en que PostgREST acepta el UPDATE pero no toca ninguna
+ *  fila (RLS lo filtró en silencio). Ver migración 0006. */
+const ERR_SIN_PERMISO =
+  'No se pudo guardar: la base de datos rechazó el cambio. Cierra sesión, vuelve a entrar e inténtalo de nuevo.'
+
+
+/**
+ * Campo numérico que guarda al salir del foco (o con Enter) y muestra el
+ * resultado real de la escritura: ✓ si guardó, ⚠ si la base lo rechazó.
+ * Nada de "optimista y a rezar": si falla, el valor vuelve al anterior.
+ */
+function InlineNumber({
+  value, onSave, prefix, allowEmpty = false, className = '', title,
+}: {
+  value: number | null
+  onSave: (v: number | null) => Promise<{ ok: boolean; message?: string }>
+  prefix?: string
+  allowEmpty?: boolean
+  className?: string
+  title?: string
+}) {
+  const asText = value === null ? '' : String(value)
+  const [draft, setDraft]   = useState(asText)
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Si el valor cambia desde fuera (guardado del modal, recarga), refleja el nuevo.
+  // Ajuste durante el render en vez de useEffect: así no pisa lo que el dueño
+  // está tecleando ni provoca un render en cascada.
+  const [prevValue, setPrevValue] = useState(value)
+  if (value !== prevValue) {
+    setPrevValue(value)
+    setDraft(asText)
+  }
+
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current) }, [])
+
+  function flash(next: 'saved' | 'error') {
+    setStatus(next)
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => setStatus('idle'), next === 'saved' ? 1_500 : 4_000)
+  }
+
+  async function commit() {
+    const raw = draft.trim()
+
+    if (raw === '') {
+      if (!allowEmpty) { setDraft(asText); return }
+      if (value === null) return
+      setStatus('saving')
+      const r = await onSave(null)
+      if (!r.ok) setDraft(String(value))
+      flash(r.ok ? 'saved' : 'error')
+      return
+    }
+
+    const parsed = Math.round(Number(raw))
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setDraft(asText)
+      return
+    }
+    if (parsed === value) { setDraft(String(parsed)); return }
+
+    setStatus('saving')
+    const r = await onSave(parsed)
+    if (!r.ok) setDraft(asText)
+    flash(r.ok ? 'saved' : 'error')
+  }
+
+  const border =
+    status === 'error' ? '#dc2626' : status === 'saved' ? '#2D6A4F' : '#e5e7eb'
+
+  return (
+    <div className={`relative flex items-center ${className}`} title={title}>
+      {prefix && <span className="text-gray-400 text-sm shrink-0 pl-2">{prefix}</span>}
+      <input
+        type="text"
+        inputMode="numeric"
+        value={draft}
+        disabled={status === 'saving'}
+        placeholder={allowEmpty ? '—' : '0'}
+        onFocus={e => e.currentTarget.select()}
+        onChange={e => setDraft(e.target.value.replace(/[^\d]/g, ''))}
+        onBlur={commit}
+        onKeyDown={e => {
+          if (e.key === 'Enter') e.currentTarget.blur()
+          if (e.key === 'Escape') {
+            setDraft(asText)
+            e.currentTarget.blur()
+          }
+        }}
+        className="w-full min-w-0 bg-transparent px-1.5 py-1 text-sm font-semibold text-gray-900 rounded-lg border focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:opacity-60"
+        style={{ borderColor: border }}
+      />
+      {status === 'saved' && <Check size={13} className="absolute -right-0.5 -top-1.5 text-emerald-600" />}
+      {status === 'error' && <AlertCircle size={13} className="absolute -right-0.5 -top-1.5 text-red-600" />}
+    </div>
+  )
+}
+
 export default function ProductsAdminClient({ initialProducts, categories }: Props) {
   const [products, setProducts] = useState<Product[]>(initialProducts)
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<Partial<Product> | null>(null)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [toast, setToast] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null)
+  const [modalError, setModalError] = useState<string | null>(null)
   const supabase = createClient()
 
   const filtered = products.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase())
   )
+  const hidden = products.filter(p => !p.active).length
 
-  async function toggleActive(product: Product) {
-    const updated = { ...product, active: !product.active }
-    setProducts(prev => prev.map(p => p.id === product.id ? updated : p))
-    await supabase.from('products').update({ active: !product.active }).eq('id', product.id)
+  function showToast(kind: 'ok' | 'error', msg: string) {
+    setToast({ kind, msg })
+    setTimeout(() => setToast(null), kind === 'ok' ? 2_500 : 7_000)
   }
 
-  async function toggleFeatured(product: Product) {
-    const updated = { ...product, featured: !product.featured }
-    setProducts(prev => prev.map(p => p.id === product.id ? updated : p))
-    await supabase.from('products').update({ featured: !product.featured }).eq('id', product.id)
+  function openEditor(p: Partial<Product>) { setModalError(null); setEditing(p) }
+  function closeEditor()                    { setModalError(null); setEditing(null) }
+
+  /**
+   * Escribe un campo y CONFIRMA que la fila cambió de verdad.
+   * PostgREST devuelve 200 con 0 filas cuando RLS bloquea el UPDATE, así que
+   * pedimos las filas afectadas: si vuelven vacías, no se guardó nada.
+   */
+  async function patchProduct(
+    id: string,
+    patch: Partial<Product>,
+  ): Promise<{ ok: boolean; message?: string }> {
+    const before = products.find(p => p.id === id)
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, ...patch } : p))
+
+    const { data, error } = await supabase
+      .from('products').update(patch).eq('id', id).select('id')
+
+    const failed = error ? error.message : (!data || data.length === 0) ? ERR_SIN_PERMISO : null
+    if (failed) {
+      console.error('[patchProduct] no se guardó:', { id, patch, error })
+      if (before) setProducts(prev => prev.map(p => p.id === id ? before : p))
+      showToast('error', failed)
+      return { ok: false, message: failed }
+    }
+    return { ok: true }
   }
+
+  const toggleActive   = (p: Product) => patchProduct(p.id, { active: !p.active })
+  const toggleFeatured = (p: Product) => patchProduct(p.id, { featured: !p.featured })
 
   async function saveProduct() {
     if (!editing) return
     setSaving(true)
+    setModalError(null)
 
     // Solo enviamos columnas reales de la tabla — excluimos `category` (join virtual)
     // y `created_at` / `id` que no deben modificarse.
@@ -62,26 +189,30 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
       images:         editing.images ?? [],
     }
 
-    if (editing.id) {
-      const { data, error } = await supabase
-        .from('products').update(payload).eq('id', editing.id)
-        .select('*, category:categories(*)').single()
-      if (error) console.error('[saveProduct] update error:', error)
-      if (data) setProducts(prev => prev.map(p => p.id === data.id ? data as Product : p))
-    } else {
-      const { data, error } = await supabase
-        .from('products').insert(payload)
-        .select('*, category:categories(*)').single()
-      if (error) console.error('[saveProduct] insert error:', error)
-      if (data) setProducts(prev => [data as Product, ...prev])
-    }
-    setSaving(false)
-    setEditing(null)
-  }
+    // `maybeSingle` en vez de `single`: si RLS filtra la fila no queremos un
+    // error genérico de parseo, queremos saber que volvió vacío.
+    const { data, error } = editing.id
+      ? await supabase.from('products').update(payload).eq('id', editing.id)
+          .select('*, category:categories(*)').maybeSingle()
+      : await supabase.from('products').insert(payload)
+          .select('*, category:categories(*)').maybeSingle()
 
-  async function updateStock(productId: string, stock: number) {
-    setProducts(prev => prev.map(p => p.id === productId ? { ...p, stock } : p))
-    await supabase.from('products').update({ stock }).eq('id', productId)
+    setSaving(false)
+
+    if (error || !data) {
+      // El modal NO se cierra: antes se cerraba igual y parecía que había
+      // guardado, que es justo por lo que "no se podían modificar los precios".
+      console.error('[saveProduct] no se guardó:', error)
+      setModalError(error?.message ?? ERR_SIN_PERMISO)
+      return
+    }
+
+    const saved = data as Product
+    setProducts(prev => editing.id
+      ? prev.map(p => p.id === saved.id ? saved : p)
+      : [saved, ...prev])
+    setEditing(null)
+    showToast('ok', editing.id ? 'Cambios guardados' : 'Producto creado')
   }
 
   /** Sube una foto al bucket product-images y la setea como única imagen del
@@ -118,16 +249,33 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
   return (
     <div className="px-4 py-5 md:px-6 md:py-6 space-y-5 pb-24 md:pb-6">
 
+      {/* ── Aviso flotante del resultado real de la última escritura ── */}
+      {toast && (
+        <div
+          role="status"
+          className="fixed left-1/2 -translate-x-1/2 bottom-24 md:bottom-8 z-[60] max-w-[92vw] md:max-w-md flex items-start gap-2 px-4 py-3 rounded-2xl shadow-lg text-sm text-white"
+          style={{ backgroundColor: toast.kind === 'ok' ? '#2D6A4F' : '#b91c1c' }}
+        >
+          {toast.kind === 'ok'
+            ? <Check size={16} className="shrink-0 mt-0.5" />
+            : <AlertCircle size={16} className="shrink-0 mt-0.5" />}
+          <span>{toast.msg}</span>
+        </div>
+      )}
+
       {/* ── Header ── */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: GREEN, fontFamily: 'var(--font-fraunces)' }}>
             Productos
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">{filtered.length} de {products.length} productos</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {filtered.length} de {products.length} productos
+            {hidden > 0 && <span className="text-gray-400"> · {hidden} ocultos del catálogo</span>}
+          </p>
         </div>
         <button
-          onClick={() => setEditing({ active: true, featured: false, unit: 'kg', stock: 0, images: [] })}
+          onClick={() => openEditor({ active: true, featured: false, unit: 'kg', stock: 0, images: [] })}
           className="flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold text-white shrink-0"
           style={{ backgroundColor: GREEN }}
         >
@@ -193,7 +341,7 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
                   />
                 </button>
                 <button
-                  onClick={() => setEditing(product)}
+                  onClick={() => openEditor(product)}
                   className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500"
                   title="Editar"
                 >
@@ -202,26 +350,34 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
               </div>
             </div>
 
-            {/* Precios + stock + toggle */}
+            {/* Precios + stock — los tres se editan aquí mismo: se escribe el
+                número y al salir del campo (o con Enter) queda guardado. */}
             <div className="grid grid-cols-3 gap-2 text-sm">
-              <div className="bg-gray-50 rounded-xl px-3 py-2">
-                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Precio</p>
-                <p className="font-semibold text-gray-900">{formatPrice(product.price)}</p>
+              <div className="bg-gray-50 rounded-xl px-2 py-2">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5 pl-1.5">Precio</p>
+                <InlineNumber
+                  value={product.price}
+                  prefix="$"
+                  title="Precio minorista"
+                  onSave={v => patchProduct(product.id, { price: v ?? 0 })}
+                />
               </div>
-              <div className="bg-gray-50 rounded-xl px-3 py-2">
-                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Mayorista</p>
-                <p className="font-semibold text-gray-700">
-                  {product.price_wholesale ? formatPrice(product.price_wholesale) : '—'}
-                </p>
+              <div className="bg-gray-50 rounded-xl px-2 py-2">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5 pl-1.5">Mayorista</p>
+                <InlineNumber
+                  value={product.price_wholesale}
+                  prefix="$"
+                  allowEmpty
+                  title="Precio mayorista (vacío = sin precio mayorista)"
+                  onSave={v => patchProduct(product.id, { price_wholesale: v })}
+                />
               </div>
-              <div className="bg-gray-50 rounded-xl px-3 py-2">
-                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5">Stock</p>
-                <input
-                  type="number"
-                  min="0"
+              <div className="bg-gray-50 rounded-xl px-2 py-2">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide mb-0.5 pl-1.5">Stock</p>
+                <InlineNumber
                   value={product.stock}
-                  onChange={e => updateStock(product.id, parseInt(e.target.value) || 0)}
-                  className="w-full text-sm font-semibold bg-transparent focus:outline-none text-gray-900"
+                  title="Stock disponible"
+                  onSave={v => patchProduct(product.id, { stock: v ?? 0 })}
                 />
               </div>
             </div>
@@ -272,19 +428,31 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
                   <p className="font-medium text-gray-900">{product.name}</p>
                   <p className="text-xs text-gray-400">{product.category?.name} · {product.unit}</p>
                 </td>
-                <td className="px-4 py-3 text-right font-medium tabular-nums">
-                  {formatPrice(product.price)}
+                <td className="px-4 py-3">
+                  <InlineNumber
+                    value={product.price}
+                    prefix="$"
+                    className="w-28 ml-auto"
+                    title="Precio minorista"
+                    onSave={v => patchProduct(product.id, { price: v ?? 0 })}
+                  />
                 </td>
-                <td className="px-4 py-3 text-right text-gray-500 tabular-nums">
-                  {product.price_wholesale ? formatPrice(product.price_wholesale) : '—'}
+                <td className="px-4 py-3">
+                  <InlineNumber
+                    value={product.price_wholesale}
+                    prefix="$"
+                    allowEmpty
+                    className="w-28 ml-auto"
+                    title="Precio mayorista (vacío = sin precio mayorista)"
+                    onSave={v => patchProduct(product.id, { price_wholesale: v })}
+                  />
                 </td>
-                <td className="px-4 py-3 text-center">
-                  <input
-                    type="number"
-                    min="0"
+                <td className="px-4 py-3">
+                  <InlineNumber
                     value={product.stock}
-                    onChange={e => updateStock(product.id, parseInt(e.target.value) || 0)}
-                    className="w-16 text-center rounded-lg border border-gray-200 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+                    className="w-16 mx-auto"
+                    title="Stock disponible"
+                    onSave={v => patchProduct(product.id, { stock: v ?? 0 })}
                   />
                 </td>
                 <td className="px-4 py-3 text-center">
@@ -306,7 +474,7 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
                 </td>
                 <td className="px-4 py-3 text-center">
                   <button
-                    onClick={() => setEditing(product)}
+                    onClick={() => openEditor(product)}
                     className="w-8 h-8 rounded-lg flex items-center justify-center mx-auto text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
                   >
                     <Pencil size={14} />
@@ -333,7 +501,7 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
                   {editing.id ? 'Editar producto' : 'Nuevo producto'}
                 </h2>
                 <button
-                  onClick={() => setEditing(null)}
+                  onClick={closeEditor}
                   className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400"
                 >
                   <X size={18} />
@@ -548,9 +716,16 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
                 </div>
               </div>
 
+              {modalError && (
+                <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                  <span>{modalError}</span>
+                </div>
+              )}
+
               <div className="flex gap-3 pt-2">
                 <button
-                  onClick={() => setEditing(null)}
+                  onClick={closeEditor}
                   className="flex-1 py-3 rounded-full border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50"
                 >
                   Cancelar
