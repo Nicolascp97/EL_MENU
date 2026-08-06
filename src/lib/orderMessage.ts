@@ -60,7 +60,7 @@ function formatUnitQty(n: number | null | undefined): string {
  *  B) String descriptivo ('200 gr', '3 unid', '1 kg'...) → se muestra tal cual
  *     unit='200 gr'           → "200 gr"
  */
-function formatUnitInfo(qty: number, unit: string, unit_qty: number | null | undefined): string {
+export function formatUnitInfo(qty: number, unit: string, unit_qty: number | null | undefined): string {
   if (UNIT_LABELS[unit]) {
     const uqVal     = Number(unit_qty ?? 1)
     const hasSubQty = Number.isFinite(uqVal) && uqVal > 0 && uqVal !== 1

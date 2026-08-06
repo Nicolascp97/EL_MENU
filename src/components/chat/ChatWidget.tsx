@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState, KeyboardEvent } from 'react'
 import { usePathname } from 'next/navigation'
-import { useChat, type ChatMessage } from '@/hooks/useChat'
+import { useChat, type ChatMessage, type CartMode } from '@/hooks/useChat'
 import { useCart } from '@/hooks/useCart'
 import { formatPrice } from '@/lib/utils'
 import type { Product } from '@/types/database'
@@ -49,8 +49,18 @@ function getEmoji(product: Product): string {
   return product.category?.emoji ?? '🥦'
 }
 
-function ProductMiniCard({ product, onAdd }: { product: Product; onAdd?: () => void }) {
+function ProductMiniCard({ product, onAdd, mode }: {
+  product: Product
+  onAdd?: () => void
+  mode: CartMode
+}) {
   const [hovered, setHovered] = useState(false)
+
+  // Mismo criterio que efectivo() en /api/chat y que itemPrice() del carrito:
+  // un formato solo-mayorista siempre va a precio mayorista.
+  const asWholesale = (mode === 'mayorista' || product.wholesale_only) && product.price_wholesale != null
+  const price = asWholesale ? product.price_wholesale! : product.price
+  const unit  = asWholesale && product.unit_wholesale ? product.unit_wholesale : product.unit
 
   return (
     <div
@@ -75,7 +85,10 @@ function ProductMiniCard({ product, onAdd }: { product: Product; onAdd?: () => v
           {product.name}
         </p>
         <p style={{ margin: 0, fontSize: 12, color: '#2D6A4F' }}>
-          {formatPrice(product.price)} / {product.unit}
+          {formatPrice(price)} / {unit}
+          {product.wholesale_only && (
+            <span style={{ color: '#C4811A', fontWeight: 600 }}> · formato mayorista</span>
+          )}
         </p>
       </div>
       {onAdd && (
@@ -93,7 +106,11 @@ function ProductMiniCard({ product, onAdd }: { product: Product; onAdd?: () => v
   )
 }
 
-function MessageBubble({ msg, onAddProduct }: { msg: ChatMessage; onAddProduct?: (p: Product) => void }) {
+function MessageBubble({ msg, onAddProduct, mode }: {
+  msg: ChatMessage
+  onAddProduct?: (p: Product) => void
+  mode: CartMode
+}) {
   const isUser = msg.role === 'user'
   const displayText = msg.displayText ?? msg.text
 
@@ -124,6 +141,7 @@ function MessageBubble({ msg, onAddProduct }: { msg: ChatMessage; onAddProduct?:
             <ProductMiniCard
               key={p.id}
               product={p}
+              mode={mode}
               onAdd={onAddProduct ? () => onAddProduct(p) : undefined}
             />
           ))}
@@ -184,6 +202,10 @@ export default function ChatWidget() {
   const { messages, setMessages, isLoading, isOpen, openChat, closeChat, sendMessage } = useChat()
   const { items } = useCart()
   const cartIsOpen = useCart(s => s.isOpen)
+  const storeCartMode = useCart(s => s.cartMode)
+  // En /mayorista el cliente está en el catálogo mayorista aunque el carrito esté
+  // vacío; fuera de ahí manda el modo del carrito (lo fija el último item agregado).
+  const mode: CartMode = pathname === '/mayorista' ? 'mayorista' : storeCartMode
   const [input, setInput] = useState('')
   const [showBubble, setShowBubble] = useState(false)
   const [viewportW, setViewportW] = useState(0)
@@ -236,10 +258,15 @@ export default function ChatWidget() {
     if (!last?.addedToCart || processedRef.current.has(last.id)) return
     processedRef.current.add(last.id)
 
+    // El segundo argumento de addItem define el cartMode. Antes se omitía, así
+    // que agregar por el chat devolvía el carrito a 'minorista': los precios
+    // mayoristas se perdían y el checkout rechazaba las cajas con "es solo para
+    // cuentas empresa". El backend nos dice en qué modo debe quedar.
+    const wholesale = last.cartMode === 'mayorista'
     last.addedToCart.forEach(({ product, qty }) => {
       const { items: cartItems, addItem, updateQty } = useCart.getState()
       if (!cartItems.find(i => i.product.id === product.id)) {
-        addItem(product)
+        addItem(product, wholesale)
       }
       updateQty(product.id, qty)
     })
@@ -253,13 +280,17 @@ export default function ChatWidget() {
     : undefined
 
   async function handleSelectProduct(product: Product) {
+    // Un formato solo-mayorista arrastra el carrito a mayorista, igual que hace
+    // ProductCard en /mayorista. Sin esto el checkout lo rechazaría después.
+    const asWholesale = mode === 'mayorista' || product.wholesale_only
+
     // Agregar al carrito inmediatamente en el frontend
     const { items: cartItems, addItem, updateQty } = useCart.getState()
     const existing = cartItems.find(i => i.product.id === product.id)
     if (existing) {
       updateQty(product.id, existing.qty + 1)
     } else {
-      addItem(product)
+      addItem(product, asWholesale)
     }
 
     // Calcular summary con el carrito ya actualizado
@@ -272,6 +303,7 @@ export default function ChatWidget() {
       `[seleccionó: ${product.name}]`,
       updatedSummary,
       `${emoji} ${product.name}`,
+      asWholesale ? 'mayorista' : mode,
     )
   }
 
@@ -279,7 +311,7 @@ export default function ChatWidget() {
     const text = input.trim()
     if (!text || isLoading) return
     setInput('')
-    await sendMessage(text, cartSummary)
+    await sendMessage(text, cartSummary, undefined, mode)
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -493,6 +525,7 @@ export default function ChatWidget() {
               <MessageBubble
                 key={msg.id}
                 msg={msg}
+                mode={mode}
                 onAddProduct={msg.role === 'assistant' ? handleSelectProduct : undefined}
               />
             ))}
