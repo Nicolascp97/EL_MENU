@@ -4,6 +4,7 @@ import { Plus, Check } from 'lucide-react'
 import { useState } from 'react'
 import type { Product } from '@/types/database'
 import { formatPrice } from '@/lib/utils'
+import { resolvePresentation } from '@/lib/units'
 import { useCart } from '@/hooks/useCart'
 
 type Props = {
@@ -24,9 +25,7 @@ export default function ProductCard({
   // En modo mayorista, la unidad mostrada cambia a unit_wholesale si está
   // seteada (ej: Aceituna retail = "gr", mayorista = "kg"). Si no se setea,
   // cae al unit retail.
-  const displayUnit = wholesaleMode && product.unit_wholesale
-    ? product.unit_wholesale
-    : product.unit
+  const presentation = resolvePresentation(product, { wholesale: wholesaleMode })
   const savings = compareAt != null && compareAt > mainPrice ? compareAt - mainPrice : 0
   const savingsPct = compareAt && savings > 0 ? Math.round((savings / compareAt) * 100) : 0
 
@@ -100,7 +99,10 @@ export default function ProductCard({
                 <p className="text-xs text-gray-400 line-through">{formatPrice(compareAt)}</p>
               )}
             </div>
-            <p className="text-[11px] text-gray-500 mt-0.5">/ {displayUnit}</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">/ {presentation.label}</p>
+            {presentation.perMeasure && (
+              <p className="text-[11px] text-gray-500">{presentation.perMeasure}</p>
+            )}
           </div>
 
           {product.stock === 0 ? (

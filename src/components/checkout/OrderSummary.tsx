@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { Minus, Plus, Trash2 } from 'lucide-react'
 import { useCart } from '@/hooks/useCart'
 import { formatPrice } from '@/lib/utils'
+import { resolvePresentation } from '@/lib/units'
 import type { Zone, UserRole } from '@/types/database'
 
 type Props = {
@@ -51,6 +52,7 @@ export default function OrderSummary({ zone, userRole }: Props) {
         {items.map(({ product, qty }) => {
           const unitPrice =
             isWholesale && product.price_wholesale != null ? product.price_wholesale : product.price
+          const presentation = resolvePresentation(product, { wholesale: isWholesale })
           const imageSrc =
             (isWholesale ? product.images?.[1] ?? product.images?.[0] : product.images?.[0]) ||
             '/placeholders/default.svg'
@@ -61,7 +63,8 @@ export default function OrderSummary({ zone, userRole }: Props) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-sm text-gray-900 truncate">{product.name}</p>
-                <p className="text-xs text-gray-500">{formatPrice(unitPrice)} / {product.unit}</p>
+                <p className="text-xs text-gray-500">{formatPrice(unitPrice)} / {presentation.label}</p>
+                {presentation.perMeasure && <p className="text-[11px] text-gray-500">{presentation.perMeasure}</p>}
                 <div className="flex items-center gap-1.5 mt-1.5">
                   <button
                     type="button"

@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation'
 import { useChat, type ChatMessage, type CartMode } from '@/hooks/useChat'
 import { useCart } from '@/hooks/useCart'
 import { formatPrice } from '@/lib/utils'
+import { resolvePresentation } from '@/lib/units'
 import type { Product } from '@/types/database'
 
 const PRODUCT_EMOJI: [RegExp, string][] = [
@@ -60,7 +61,7 @@ function ProductMiniCard({ product, onAdd, mode }: {
   // un formato solo-mayorista siempre va a precio mayorista.
   const asWholesale = (mode === 'mayorista' || product.wholesale_only) && product.price_wholesale != null
   const price = asWholesale ? product.price_wholesale! : product.price
-  const unit  = asWholesale && product.unit_wholesale ? product.unit_wholesale : product.unit
+  const presentation = resolvePresentation(product, { wholesale: asWholesale })
 
   return (
     <div
@@ -85,7 +86,8 @@ function ProductMiniCard({ product, onAdd, mode }: {
           {product.name}
         </p>
         <p style={{ margin: 0, fontSize: 12, color: '#2D6A4F' }}>
-          {formatPrice(price)} / {unit}
+          {formatPrice(price)} / {presentation.label}
+          {presentation.perMeasure && ` · ${presentation.perMeasure}`}
           {product.wholesale_only && (
             <span style={{ color: '#C4811A', fontWeight: 600 }}> · formato mayorista</span>
           )}
@@ -162,11 +164,11 @@ function MessageBubble({ msg, onAddProduct, mode }: {
             ✓ Agregado al carrito
           </p>
           {msg.addedToCart.map(({ product, qty }) => {
-            // unit "1 kg" → "kg" so display reads "× 1 kg" not "× 1 1 kg"
-            const unit = product.unit.startsWith('1 ') ? product.unit.slice(2) : product.unit
+            const wholesale = (mode === 'mayorista' || product.wholesale_only) && product.price_wholesale != null
+            const presentation = resolvePresentation(product, { wholesale })
             return (
               <p key={product.id} style={{ margin: '2px 0', fontSize: 12, color: '#1B2B1E' }}>
-                {product.name} × {qty} {unit}
+                {product.name} × {qty} {presentation.label}
               </p>
             )
           })}

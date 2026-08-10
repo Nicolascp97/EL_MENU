@@ -8,6 +8,7 @@ import type { UserRole, Product, Recipe } from '@/types/database'
 import dynamic from 'next/dynamic'
 import { useCart } from '@/hooks/useCart'
 import { useChatStore } from '@/hooks/useChatStore'
+import { resolvePresentation } from '@/lib/units'
 import RecipesSection from './RecipesSection'
 
 const ZonesMap = dynamic(() => import('@/components/ZonesMap'), { ssr: false })
@@ -811,7 +812,9 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
                 ))}
               </div>
               <div className="products">
-                {tabProducts[activeTab].slice(0, 10).map(p => (
+                {tabProducts[activeTab].slice(0, 10).map(p => {
+                  const presentation = resolvePresentation(p)
+                  return (
                   <div key={p.id} className="product">
                     <div className="img">
                       {p.images?.[0]
@@ -820,7 +823,10 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
                       }
                     </div>
                     <div className="name">{p.name}</div>
-                    <div className="unit">{p.unit}</div>
+                    <div className="unit">
+                      {presentation.label}
+                      {presentation.perMeasure && ` · ${presentation.perMeasure}`}
+                    </div>
                     <div className="product-foot col">
                       <div className="price">{fmt(p.price)}</div>
                       <button
@@ -832,7 +838,8 @@ export default function HomeClient({ featuredProducts, recipes }: { featuredProd
                       </button>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           </section>

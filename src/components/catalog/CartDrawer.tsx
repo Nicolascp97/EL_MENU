@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useCart } from '@/hooks/useCart'
 import { formatPrice } from '@/lib/utils'
+import { resolvePresentation } from '@/lib/units'
 
 const DELIVERY_PRICE = 2990
 
@@ -80,7 +81,9 @@ export default function CartDrawer() {
               </button>
             </div>
           ) : (
-            items.map(({ product, qty }) => (
+            items.map(({ product, qty }) => {
+              const presentation = resolvePresentation(product, { wholesale: cartMode === 'mayorista' })
+              return (
               <div key={product.id} className="flex gap-3 items-center">
                 <div className="relative w-16 h-16 rounded-xl overflow-hidden bg-gray-50 shrink-0">
                   <Image
@@ -93,7 +96,8 @@ export default function CartDrawer() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm text-gray-900 truncate">{product.name}</p>
-                  <p className="text-xs text-gray-500">{formatPrice(itemPrice(product))} / {cartMode === 'mayorista' && product.unit_wholesale ? product.unit_wholesale : product.unit}</p>
+                  <p className="text-xs text-gray-500">{formatPrice(itemPrice(product))} / {presentation.label}</p>
+                  {presentation.perMeasure && <p className="text-[11px] text-gray-500">{presentation.perMeasure}</p>}
                   <div className="flex items-center gap-2 mt-1.5">
                     <button
                       onClick={() => updateQty(product.id, qty - 1)}
@@ -119,7 +123,8 @@ export default function CartDrawer() {
                   </button>
                 </div>
               </div>
-            ))
+              )
+            })
           )}
         </div>
 

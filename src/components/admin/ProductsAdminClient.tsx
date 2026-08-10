@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Product, Category } from '@/types/database'
+import { ENVASE_UNITS, buildEnvaseUnit, splitEnvaseContent, resolvePresentation } from '@/lib/units'
 import { Pencil, Plus, ToggleLeft, ToggleRight, Star, Search, X, Package, Image as ImageIcon, Upload, Check, AlertCircle } from 'lucide-react'
 
 type Props = {
@@ -11,8 +12,28 @@ type Props = {
 
 const GREEN = '#1B2B1E'
 const ACCENT = '#E8621A'
-const UNIT_OPTIONS = ['kg', 'unid', 'ramo', 'bolsa', 'maceta', 'caja', 'paq', 'gr'] as const
+const UNIT_OPTIONS = ['kg', 'unid', 'ramo', 'bolsa', 'maceta', 'caja', 'paq', 'gr', 'malla', 'saco', 'atado'] as const
+const CONTENT_OPTIONS = [
+  { value: 'kg', label: 'kilos' },
+  { value: 'gr', label: 'gramos' },
+  { value: 'unid', label: 'unidades' },
+] as const
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+/**
+ * Un envase (caja, malla, saco...) puede declarar cuánto trae adentro. Eso se
+ * guarda en un solo string, 'caja 18kg', igual que los formatos que ya existían
+ * en la base. Acá se parte en las tres piezas que muestra el formulario.
+ * Ver src/lib/units.ts.
+ */
+function unitParts(unit: string | null | undefined): { key: string; qty: number | null; base: string } {
+  const raw = (unit ?? '').trim()
+  const contenido = splitEnvaseContent(raw)
+  if (contenido) return { key: contenido.envase, qty: contenido.qty, base: contenido.base }
+  return { key: raw, qty: null, base: 'kg' }
+}
+
+const esEnvase = (key: string) => ENVASE_UNITS.includes(key)
 
 /** Mensaje para el caso en que PostgREST acepta el UPDATE pero no toca ninguna
  *  fila (RLS lo filtró en silencio). Ver migración 0006. */
@@ -553,63 +574,7 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
                   </div>
                 </div>
 
-                <div className="grid grid-cols-[1fr_1fr] gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 mb-1 block">Cantidad minorista</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
-                      placeholder="1"
-                      value={editing.unit_qty ?? 1}
-                      onChange={e => setEditing({ ...editing, unit_qty: Number(e.target.value) || 1 })}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 mb-1 block">Unidad minorista</label>
-                    <select
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 bg-white"
-                      value={editing.unit || 'kg'}
-                      onChange={e => setEditing({ ...editing, unit: e.target.value })}
-                    >
-                      {UNIT_OPTIONS.map(u => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-[1fr_1fr] gap-3">
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 mb-1 block">Cantidad mayorista</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="any"
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
-                      placeholder="— igual que minorista —"
-                      value={editing.unit_qty_wholesale ?? ''}
-                      onChange={e => {
-                        const v = e.target.value
-                        setEditing({ ...editing, unit_qty_wholesale: v === '' ? null : Number(v) })
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 mb-1 block">Unidad mayorista</label>
-                    <select
-                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 bg-white"
-                      value={editing.unit_wholesale ?? ''}
-                      onChange={e => setEditing({ ...editing, unit_wholesale: e.target.value || null })}
-                    >
-                      <option value="">— igual que minorista —</option>
-                      {UNIT_OPTIONS.map(u => (
-                        <option key={u} value={u}>{u}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
+                <PresentacionFields editing={editing} setEditing={setEditing} />
 
                 <div>
                   <label className="text-xs font-medium text-gray-500 mb-1 block">Stock inicial</label>
@@ -744,5 +709,167 @@ export default function ProductsAdminClient({ initialProducts, categories }: Pro
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * Los campos que definen cuánto se lleva el cliente: cantidad + unidad y, cuando
+ * la unidad es un envase (caja, malla, saco...), cuánto trae adentro.
+ *
+ * Sin el campo de contenido no había forma de declarar que una Caja Plátanos
+ * trae 18 kg: se guardaba unit='caja' con unit_qty=18 y el catálogo mostraba
+ * "18 cajas". Para envases el contenido reemplaza a la cantidad, y se guarda
+ * como un solo string ('caja 18kg') igual que los formatos que ya venían en la
+ * base. Ver src/lib/units.ts.
+ */
+function PresentacionFields({ editing, setEditing }: {
+  editing: Partial<Product>
+  setEditing: (next: Partial<Product>) => void
+}) {
+  const retail = unitParts(editing.unit)
+  const mayorista = unitParts(editing.unit_wholesale)
+  const retailEsEnvase = esEnvase(retail.key)
+  const mayoristaEsEnvase = esEnvase(mayorista.key)
+
+  const inputClass = 'w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200'
+  const selectClass = `${inputClass} bg-white`
+  const labelClass = 'text-xs font-medium text-gray-500 mb-1 block'
+
+  const vistaPrevia = resolvePresentation({
+    price: editing.price ?? 0,
+    price_wholesale: editing.price_wholesale ?? null,
+    unit: editing.unit || 'kg',
+    unit_wholesale: editing.unit_wholesale ?? null,
+    unit_qty: editing.unit_qty ?? 1,
+    unit_qty_wholesale: editing.unit_qty_wholesale ?? null,
+  })
+
+  return (
+    <>
+      <div className={retailEsEnvase ? '' : 'grid grid-cols-[1fr_1fr] gap-3'}>
+        {!retailEsEnvase && (
+          <div>
+            <label className={labelClass}>Cantidad minorista</label>
+            <input
+              type="number" min="0" step="any" className={inputClass} placeholder="1"
+              value={editing.unit_qty ?? 1}
+              onChange={e => setEditing({ ...editing, unit_qty: Number(e.target.value) || 1 })}
+            />
+          </div>
+        )}
+        <div>
+          <label className={labelClass}>Unidad minorista</label>
+          <select
+            className={selectClass}
+            value={retail.key || 'kg'}
+            onChange={e => {
+              const key = e.target.value
+              setEditing({
+                ...editing,
+                unit: esEnvase(key) ? buildEnvaseUnit(key, retail.qty, retail.base) : key,
+                ...(esEnvase(key) ? { unit_qty: 1 } : {}),
+              })
+            }}
+          >
+            {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {retailEsEnvase && (
+        <div className="grid grid-cols-[1fr_1fr] gap-3">
+          <div>
+            <label className={labelClass}>¿Cuánto trae?</label>
+            <input
+              type="number" min="0" step="any" className={inputClass} placeholder="— sin declarar —"
+              value={retail.qty ?? ''}
+              onChange={e => {
+                const v = e.target.value
+                setEditing({ ...editing, unit: buildEnvaseUnit(retail.key, v === '' ? null : Number(v), retail.base) })
+              }}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Medida del contenido</label>
+            <select
+              className={selectClass}
+              value={retail.base}
+              onChange={e => setEditing({ ...editing, unit: buildEnvaseUnit(retail.key, retail.qty, e.target.value) })}
+            >
+              {CONTENT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
+
+      <div className={mayoristaEsEnvase ? '' : 'grid grid-cols-[1fr_1fr] gap-3'}>
+        {!mayoristaEsEnvase && (
+          <div>
+            <label className={labelClass}>Cantidad mayorista</label>
+            <input
+              type="number" min="0" step="any" className={inputClass} placeholder="— igual que minorista —"
+              value={editing.unit_qty_wholesale ?? ''}
+              onChange={e => {
+                const v = e.target.value
+                setEditing({ ...editing, unit_qty_wholesale: v === '' ? null : Number(v) })
+              }}
+            />
+          </div>
+        )}
+        <div>
+          <label className={labelClass}>Unidad mayorista</label>
+          <select
+            className={selectClass}
+            value={mayorista.key}
+            onChange={e => {
+              const key = e.target.value
+              if (!key) return setEditing({ ...editing, unit_wholesale: null })
+              setEditing({
+                ...editing,
+                unit_wholesale: esEnvase(key) ? buildEnvaseUnit(key, mayorista.qty, mayorista.base) : key,
+                ...(esEnvase(key) ? { unit_qty_wholesale: null } : {}),
+              })
+            }}
+          >
+            <option value="">— igual que minorista —</option>
+            {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {mayoristaEsEnvase && (
+        <div className="grid grid-cols-[1fr_1fr] gap-3">
+          <div>
+            <label className={labelClass}>¿Cuánto trae? (mayorista)</label>
+            <input
+              type="number" min="0" step="any" className={inputClass} placeholder="— sin declarar —"
+              value={mayorista.qty ?? ''}
+              onChange={e => {
+                const v = e.target.value
+                setEditing({ ...editing, unit_wholesale: buildEnvaseUnit(mayorista.key, v === '' ? null : Number(v), mayorista.base) })
+              }}
+            />
+          </div>
+          <div>
+            <label className={labelClass}>Medida del contenido</label>
+            <select
+              className={selectClass}
+              value={mayorista.base}
+              onChange={e => setEditing({ ...editing, unit_wholesale: buildEnvaseUnit(mayorista.key, mayorista.qty, e.target.value) })}
+            >
+              {CONTENT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-xl bg-emerald-50 border border-emerald-100 px-3 py-2">
+        <p className="text-[11px] font-medium text-emerald-800">Así lo verá el cliente</p>
+        <p className="text-sm text-emerald-900">
+          {vistaPrevia.label}
+          {vistaPrevia.perMeasure && <span className="text-emerald-700"> · {vistaPrevia.perMeasure}</span>}
+        </p>
+      </div>
+    </>
   )
 }

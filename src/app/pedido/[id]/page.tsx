@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import Navbar from '@/components/catalog/Navbar'
 import { formatPrice } from '@/lib/utils'
+import { resolvePresentation } from '@/lib/units'
 import type { Order } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
@@ -95,19 +96,29 @@ export default async function PedidoPage({ params }: { params: Params }) {
             <h2 className="font-semibold text-gray-900">Productos</h2>
           </div>
           <ul className="divide-y divide-gray-100">
-            {order.items.map((it, i) => (
+            {order.items.map((it, i) => {
+              const presentation = resolvePresentation({
+                price: it.unit_price,
+                price_wholesale: null,
+                unit: it.unit,
+                unit_wholesale: null,
+                unit_qty: it.unit_qty,
+                unit_qty_wholesale: null,
+              })
+              return (
               <li key={i} className="px-5 py-3 flex justify-between items-baseline gap-3">
                 <div className="min-w-0">
                   <p className="font-medium text-sm text-gray-900 truncate">{it.product_name}</p>
                   <p className="text-xs text-gray-500">
-                    {it.qty} × {formatPrice(it.unit_price)} / {it.unit}
+                    {it.qty} × {formatPrice(it.unit_price)} / {presentation.label}
                   </p>
                 </div>
                 <p className="text-sm font-semibold text-gray-900 tabular-nums shrink-0">
                   {formatPrice(it.unit_price * it.qty)}
                 </p>
               </li>
-            ))}
+              )
+            })}
           </ul>
           <div className="px-5 py-4 border-t border-gray-100 flex justify-between font-semibold">
             <span>Total</span>

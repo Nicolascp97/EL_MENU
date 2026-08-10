@@ -3,6 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Order, OrderStatus } from '@/types/database'
 import { formatPrice } from '@/lib/utils'
+import { resolvePresentation } from '@/lib/units'
 
 // ─── Tipos para solicitudes mayoristas ───────────────────────────────────────
 type MayoristaRequest = {
@@ -434,7 +435,7 @@ function OrderCard({ order, updating, onUpdateStatus }: {
   const isCancellable = order.status !== 'entregado' && order.status !== 'cancelado'
   const [confirming, setConfirming] = useState(false)
   const [showAll, setShowAll] = useState(false)
-  const items = order.items as { product_name: string; qty: number; unit: string; unit_price: number }[]
+  const items = order.items as { product_name: string; qty: number; unit: string; unit_price: number; unit_qty?: number }[]
   const extraCount = items.length - 3
 
   function handleCancelClick() {
@@ -471,12 +472,22 @@ function OrderCard({ order, updating, onUpdateStatus }: {
 
       {/* Items */}
       <div style={{ borderTop: '1px solid #F0F7F1', paddingTop: 8, marginBottom: 10 }}>
-        {(showAll ? items : items.slice(0, 3)).map((item, i) => (
+        {(showAll ? items : items.slice(0, 3)).map((item, i) => {
+          const presentation = resolvePresentation({
+            price: item.unit_price,
+            price_wholesale: null,
+            unit: item.unit,
+            unit_wholesale: null,
+            unit_qty: item.unit_qty,
+            unit_qty_wholesale: null,
+          })
+          return (
           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6B7A6F', lineHeight: 1.7, gap: 8 }}>
-            <span>{item.product_name} × {item.qty} {item.unit}</span>
+            <span>{item.product_name} × {item.qty} {presentation.label}</span>
             <span style={{ whiteSpace: 'nowrap' }}>{formatPrice(item.unit_price * item.qty)}</span>
           </div>
-        ))}
+          )
+        })}
 
         {extraCount > 0 && (
           <button
