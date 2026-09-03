@@ -89,13 +89,13 @@ export default async function ConfirmacionPage({ searchParams }: { searchParams:
               <XCircle className="mx-auto text-rose-600" size={72} strokeWidth={1.5} />
             )}
             <h1 className="text-2xl md:text-3xl font-bold mt-4" style={{ fontFamily: 'var(--font-fraunces)' }}>
-              {isSuccess   && '¡Pedido confirmado!'}
+              {isSuccess   && '¡Pago aprobado! Falta 1 paso'}
               {isTransfer  && '¡Pedido recibido!'}
               {isCancelled && 'Pago cancelado'}
               {!isSuccess && !isTransfer && !isCancelled && 'No pudimos procesar el pago'}
             </h1>
             <p className="text-gray-600 mt-2 text-sm">
-              {isSuccess   && 'Recibimos tu pedido y lo estamos preparando. Te avisamos por WhatsApp cuando salga el despacho.'}
+              {isSuccess   && 'Para que el restaurante reciba tu pedido, toca el botón de WhatsApp de abajo.'}
               {isTransfer  && 'Ya estamos esperando tu transferencia. Envía el comprobante por WhatsApp para confirmar el despacho.'}
               {isCancelled && 'No se cobró nada. Podés volver al catálogo y reintentar cuando quieras.'}
               {!isSuccess && !isTransfer && !isCancelled && 'No te cobraron nada. Probá de nuevo o contáctanos si el problema persiste.'}
